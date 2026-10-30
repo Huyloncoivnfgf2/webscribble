@@ -10,9 +10,10 @@
   sau lần tải đầu tiên, không bắt buộc tài khoản, chức năng cốt lõi miễn phí.
   Ba chế độ làm việc: Document Mode, Split Mode, Whiteboard Mode (DEC-014).
 - **Thư mục gốc dự án:** `~/workspace/webscribble/`
-- **Trạng thái:** Đã xong TASK-00 → TASK-03 (bộ nhớ, khảo sát, chốt kiến
-  trúc DEC-016 → 023, khởi tạo khung dự án chạy được). Đã có mã nguồn
-  khung — **chưa có chức năng sản phẩm**; bước tiếp theo là TASK-04.
+- **Trạng thái:** Đã xong TASK-00 → TASK-04 (bộ nhớ, khảo sát, chốt kiến
+  trúc DEC-016 → 023, khung dự án, UI shell + điều hướng). Đã có giao
+  diện khung hoàn chỉnh ở mức UI — **chưa có engine/chức năng xử lý tài
+  liệu**; bước tiếp theo là TASK-05 (Drawing Engine).
 
 ## 2. Bản đồ tài liệu (thư mục `docs/`)
 
@@ -46,15 +47,15 @@ toàn bộ lịch sử hội thoại.
 
 ## 4. Task hiện tại
 
-- **Vừa hoàn thành:** TASK-03 — Khởi tạo khung dự án (Vite + React + TS +
-  Tailwind + ESLint; build/lint/dev đã kiểm chứng). Trước đó: TASK-02
-  (chốt kiến trúc), TASK-01 (khảo sát), TASK-00 (bộ nhớ).
+- **Vừa hoàn thành:** TASK-04 — UI shell & điều hướng cơ bản (đã kiểm
+  chứng bằng trình duyệt headless 3 kích thước màn hình). Trước đó:
+  TASK-03 (khung dự án), TASK-02 (chốt kiến trúc), TASK-01, TASK-00.
 - **Đang thực hiện:** (chưa có — chờ chủ dự án giao task tiếp theo)
-- **Kế tiếp dự kiến:** TASK-04 — UI shell & điều hướng cơ bản.
+- **Kế tiếp dự kiến:** TASK-05 — Drawing Engine (lõi viết tay, DEC-015).
 - Chi tiết trạng thái: `CURRENT_STATE.md`. Không tự ý bắt đầu task mới.
 
 ## 5. Phiên bản tài liệu
 
-- **Docs version:** 1.4
+- **Docs version:** 1.5
 - **Ngày cập nhật:** 2026-10-30
 - **Task tạo:** TASK-00

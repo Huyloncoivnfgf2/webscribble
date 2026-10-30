@@ -5,6 +5,52 @@
 
 ## Lịch sử
 
+### TASK-04 — 2026-10-30 — UI shell & điều hướng cơ bản
+
+- **File được tạo (11):** `src/app/navigation.ts` (kiểu ViewKey/ModeKey +
+  tiêu đề các khu vực); `src/app/layouts/AppShell.tsx`;
+  `src/app/components/Sidebar.tsx` (Sidebar desktop thu gọn được +
+  MobileDrawer), `Header.tsx`, `WelcomeSection.tsx`, `QuickActions.tsx`,
+  `RecentDocuments.tsx`, `WorkspaceModes.tsx` (3 thẻ chế độ + panel xem
+  trước); `src/app/features/home/HomePage.tsx`,
+  `features/documents/DocumentsPage.tsx` (2 biến thể: gần đây / tất cả),
+  `features/whiteboard/WhiteboardPage.tsx`,
+  `features/settings/SettingsPage.tsx`.
+- **File được sửa:** `src/app/App.tsx` (giữ mỏng — chỉ giữ state điều
+  hướng và ghép shell + trang), `src/app/components/Sidebar.tsx` (sửa
+  hiển thị tagline ở brand: bỏ cắt chữ bằng dấu "…" để tagline xuống
+  dòng gọn — phát hiện khi xem ảnh chụp kiểm tra), `package.json` +
+  `package-lock.json` (thêm lucide-react). Đã xóa 3 `.gitkeep` ở
+  components/layouts/features vì thư mục đã có file thật.
+- **Dependency mới:** `lucide-react@1.65.0` — giấy phép **ISC** (đọc từ
+  gói đã cài), cài qua npm, không CDN. Lưu ý phiên bản này đã đổi tên
+  một số icon (Home → House, FilePlus2 → FilePlus/FilePlusCorner) — đã
+  đối chiếu tên icon với bản cài trước khi dùng.
+- **Thiết kế:** Minimalist Premium; trắng/xám trung tính/xanh dương nhạt,
+  xanh dương đậm cho primary/active/focus; bo góc, bóng nhẹ; không dùng
+  Aurora Gradient; không sao chép giao diện ứng dụng khác. Responsive:
+  sidebar tĩnh từ breakpoint `lg`, dưới `lg` dùng drawer có backdrop;
+  lưới thẻ 3 cột → 1 cột; header rút gọn (ẩn ô tìm kiếm dưới `md`).
+- **Tương tác đã hoạt động (kiểm chứng thật):** điều hướng 5 khu vực;
+  thu gọn sidebar 256px → 76px; drawer mobile mở/đóng và tự đóng sau khi
+  chọn mục; chọn 1 trong 3 chế độ (trạng thái active qua `aria-selected`
+  + panel xem trước đổi theo chế độ, gồm mock 2 vùng cho Split Mode);
+  Quick Actions điều hướng đúng đích. Các nút chưa có chức năng thật
+  (Mở tài liệu từ thiết bị, Tạo bảng trắng, Tạo tài liệu mới) hiển thị
+  **thông báo trung thực** nêu rõ task sẽ triển khai — không dữ liệu giả,
+  không giả vờ thành công. Ô tìm kiếm là UI hiển thị (chưa gắn tìm kiếm
+  thật, thuộc các task sau).
+- **Kiểm tra đã chạy:** `npm run lint` đạt (exit 0); `npm run build` đạt
+  (CSS 24,05 kB, JS 247,30 kB); grep CDN — sạch. Kiểm tra trình duyệt:
+  trình duyệt xem trước từ xa **không truy cập được localhost** của máy
+  này, nên đã tự kiểm tra bằng Chromium headless (Playwright) chạy ngay
+  trên máy — 9 ảnh chụp ở 1440×900, 768×1024, 390×844: không tràn ngang
+  ở cả 3 kích thước, đủ các tương tác nêu trên, **0 lỗi console/page**.
+  Thư viện Playwright chỉ cài ở `/tmp/qa` phục vụ kiểm tra, **không**
+  phải dependency của dự án.
+- **Git:** thay đổi TASK-04 đang ở working tree (18 mục), **chưa commit**
+  theo yêu cầu — chờ chủ dự án duyệt.
+
 ### TASK-03 — 2026-10-30 — Khởi tạo khung dự án
 
 - **File/thư mục được tạo:** khung ứng dụng tại `~/workspace/webscribble/`

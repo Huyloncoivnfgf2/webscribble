@@ -101,7 +101,7 @@
   triển; cấu trúc thư mục khớp ARCHITECTURE.md.
 
 ## TASK-04 — UI shell & responsive layout
-- **Trạng thái:** NOT_STARTED
+- **Trạng thái:** DONE
 - **Mục tiêu:** Khung giao diện: màn hình thư viện tài liệu, màn hình làm việc,
   thanh công cụ; responsive desktop/tablet/mobile.
 - **Phụ thuộc:** TASK-03.
@@ -109,6 +109,21 @@
 - **File dự kiến:** `src/app/**`.
 - **Tiêu chí nghiệm thu:** Hiển thị đúng trên 3 kích thước màn hình đại diện;
   nút công cụ đủ lớn cho cảm ứng; không lỗi console.
+- **Kết quả:** Hoàn thành 2026-10-30. Application Shell gồm Sidebar (logo +
+  5 mục điều hướng, thu gọn 256px → 76px trên desktop, drawer trên mobile),
+  Header (breadcrumb + tiêu đề, ô tìm kiếm giao diện, nút cài đặt), Main
+  Workspace với 4 khu vực ở Trang chủ: Welcome, Quick Actions, Workspace
+  Modes (3 thẻ chế độ chọn được + panel xem trước theo chế độ), Recent
+  Documents (empty state — **không dùng dữ liệu giả**). Các trang Tài liệu
+  gần đây / Tài liệu của tôi / Bảng trắng / Cài đặt là placeholder trung
+  thực: nút chưa có chức năng thật hiển thị thông báo rõ ràng thay vì giả
+  vờ thành công. Phong cách Minimalist Premium, bảng màu trắng/xám/xanh
+  dương nhạt; icon Lucide qua npm (lucide-react 1.65.0, ISC). Đã kiểm
+  chứng bằng trình duyệt headless ngay trên máy: 1440/768/390px không
+  tràn ngang, drawer mobile đóng/mở và điều hướng đúng, chọn Split Mode
+  đổi xem trước + trạng thái active, thông báo ở trang Tài liệu xuất
+  hiện, **không lỗi console**. `lint`/`build` đạt. Chi tiết: CHANGELOG.md
+  mục TASK-04. Thay đổi chưa commit (chờ chủ dự án duyệt).
 
 ## TASK-05 — Drawing Engine
 - **Trạng thái:** NOT_STARTED

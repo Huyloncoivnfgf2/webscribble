@@ -4,17 +4,17 @@
 
 ## 1. Giai đoạn hiện tại
 
-**Giai đoạn 1 — Xây dựng nền tảng: ĐANG BẮT ĐẦU.** Giai đoạn 0 (bộ nhớ,
-khảo sát, chốt kiến trúc TASK-00 → 02) đã xong. **Khung dự án đã được
-khởi tạo tại TASK-03**: Vite + React + TypeScript + Tailwind CSS v4 +
-ESLint, cấu trúc thư mục theo kiến trúc đã chốt, `dev`/`build`/`lint`
-chạy được, Git local đã khởi tạo (chưa commit). **Chưa có chức năng sản
-phẩm nào** — các engine mới là thư mục + README placeholder. Bước tiếp
-theo là TASK-04 (UI shell & điều hướng cơ bản).
+**Giai đoạn 1 — Xây dựng nền tảng: ĐANG DIỄN RA.** Giai đoạn 0 (bộ nhớ,
+khảo sát, chốt kiến trúc TASK-00 → 02) đã xong. Khung dự án (TASK-03) và
+**UI shell + điều hướng cơ bản (TASK-04)** đã hoàn thành: app có Sidebar/
+Header/Main Workspace, trang chủ với 3 chế độ làm việc ở mức UI và các
+trang placeholder trung thực — **chưa có engine hay chức năng xử lý tài
+liệu nào**. Bước tiếp theo là TASK-05 (Drawing Engine — lõi viết tay).
 
 ## 2. Task đang thực hiện
 
-- (Không có — TASK-03 vừa hoàn thành, chờ chủ dự án giao task tiếp theo.)
+- (Không có — TASK-04 vừa hoàn thành, chờ chủ dự án giao task tiếp theo.
+  Thay đổi của TASK-04 chưa commit — chờ duyệt.)
 
 ## 3. Task đã hoàn thành
 
@@ -24,6 +24,7 @@ theo là TASK-04 (UI shell & điều hướng cơ bản).
 | TASK-01 | Khảo sát & kiểm chứng công nghệ | 2026-10-30 | 3 file trong `docs/research/` (TECH_SURVEY, STUDYWRITE_MODULE_AUDIT, THREE_MODES_ARCHITECTURE_RESEARCH) — xem CHANGELOG.md |
 | TASK-02 | Chốt kiến trúc & quyết định công nghệ | 2026-10-30 | DEC-016 → DEC-023 trong DECISIONS.md; ARCHITECTURE.md mục 1 bản chốt; PRODUCT_SPEC đồng bộ — xem CHANGELOG.md |
 | TASK-03 | Khởi tạo khung dự án (project skeleton) | 2026-10-30 | `package.json` + `package-lock.json`, `src/**` theo ARCHITECTURE.md mục 3; build/lint/dev đã chạy thật đạt — xem CHANGELOG.md |
+| TASK-04 | UI shell & responsive layout | 2026-10-30 | `src/app/**` (shell, 5 trang/khu vực, 3 chế độ ở mức UI); kiểm chứng headless browser 3 kích thước + tương tác, 0 lỗi console — xem CHANGELOG.md. Chưa commit |
 
 Ngoài roadmap: ngày 2026-10-30 đã có một lượt **cập nhật bộ nhớ** theo yêu
 cầu chủ dự án (không phải task roadmap, không đánh dấu DONE cho task nào):
@@ -34,12 +35,13 @@ CHANGELOG.md.
 
 ## 4. Task tiếp theo (chưa bắt đầu — chờ yêu cầu)
 
-- **TASK-04** — UI shell & điều hướng cơ bản: layout chính (thư viện tài
-  liệu, màn hình làm việc trống), điều hướng giữa các màn hình, thanh
-  công cụ khung. Chưa có chức năng mở/vẽ tài liệu thật.
-- Sau TASK-04: TASK-05 (Drawing Engine — lõi viết tay) theo roadmap.
-- Việc chờ chủ dự án ngoài roadmap: duyệt **commit đầu tiên** cho Git
-  local và quyết định hosting/remote (phần còn lại của ISSUE-008).
+- **TASK-05** — Drawing Engine (lõi viết tay dùng chung cho 3 chế độ,
+  DEC-015): canvas 2 lớp, bút/highlight/tẩy, pressure, `getCoalescedEvents`
+  kèm feature-detect, undo/redo, mô hình dữ liệu nét vẽ. Đây cũng là nơi
+  kiểm chứng thực tế các điểm còn mở của ISSUE-006 bằng thiết bị/bản thử.
+- Việc chờ chủ dự án ngoài roadmap: duyệt **commit TASK-04** (thay đổi
+  đang ở working tree) và quyết định hosting/remote (phần còn lại của
+  ISSUE-008).
 
 ## 5. Công nghệ đã xác minh
 
