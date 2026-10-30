@@ -1,0 +1,265 @@
+# KNOWN_ISSUES — WebScribble
+
+> Vấn đề chưa xác minh, rủi ro kỹ thuật, quyết định còn thiếu, lỗi đã phát hiện.
+> **Không tự xóa issue** khi chưa có bằng chứng giải quyết; khi đã xử lý, đổi
+> trạng thái thành `RESOLVED` kèm bằng chứng và ngày.
+
+Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RESOLVED`.
+
+---
+
+## ISSUE-001 — Stack công nghệ đề xuất chưa được kiểm chứng
+- **Loại:** Chưa xác minh / rủi ro tương thích.
+- **Mô tả:** React, TypeScript, Vite, Tailwind CSS, PDF.js, pdf-lib, Tiptap,
+  IndexedDB, Zustand, Service Worker mới là đề xuất. Chưa kiểm tra: tương
+  thích lẫn nhau, tổng dung lượng cần cache cho offline, hành vi Service
+  Worker/IndexedDB trên Safari iOS.
+- **Ảnh hưởng:** Chặn TASK-02 (chốt kiến trúc) và TASK-03.
+- **Hướng xử lý:** TASK-01 khảo sát và kiểm chứng từng mục.
+- **Kết quả khảo sát (TASK-01, 2026-10-30):** Đã kiểm chứng ở cấp tài
+  liệu/nguồn chính thức + npm registry — xem `docs/research/TECH_SURVEY.md`.
+  Toàn bộ stack đứng vững: 6 mục USE, 6 mục USE WITH CONDITIONS, không mục
+  nào phải loại; giấy phép toàn MIT/Apache-2.0/BSD/ISC. Mọi thư viện đều
+  đóng gói qua npm được (không phụ thuộc CDN). Phát hiện lớn nhất không
+  nằm ở thư viện mà ở chính sách storage Safari iOS (ITP 7 ngày — chi
+  tiết ở TECH_SURVEY mục 5.3). Còn UNVERIFIED cần prototype ở các task
+  sau: giới hạn canvas/bộ nhớ iOS, bộ nhớ pdf-lib với file lớn, chất
+  lượng html-to-docx, giấy phép công cụ sinh Service Worker.
+- **Trạng thái:** RESOLVED (2026-10-30, tại TASK-02) — Stack đã được chủ
+  dự án chốt chính thức tại **DEC-016** trên cơ sở khảo sát này. Các điểm
+  UNVERIFIED còn lại (giới hạn canvas/bộ nhớ iOS, bộ nhớ pdf-lib với file
+  lớn, html-to-docx, giấy phép công cụ sinh SW) không phải nội dung của
+  issue này nữa — chúng đã có task kiểm chứng riêng trong TECH_SURVEY
+  mục 7 (TASK-05/06/09/10) và điều kiện kiểm tra lại giấy phép phiên bản
+  thực tế đã nằm trong DEC-016.
+
+## ISSUE-002 — Độ trung thực DOCX khi sửa bằng editor nền HTML
+- **Loại:** Rủi ro kỹ thuật.
+- **Mô tả:** Tiptap (và các editor HTML tương tự) làm việc trên mô hình HTML,
+  còn DOCX có mô hình định dạng riêng (styles, section, numbering...). Việc
+  mở DOCX → sửa → lưu lại DOCX có nguy cơ mất/thay đổi định dạng gốc.
+- **Ảnh hưởng:** Word Engine (TASK-07) và Export (TASK-09).
+- **Hướng xử lý:** Khảo sát ở TASK-01; có thể cần chấp nhận phạm vi định dạng
+  hỗ trợ giới hạn và ghi rõ cho người dùng.
+- **Bằng chứng bổ sung (TASK-01, 2026-10-30):** Đã xác nhận bằng tài liệu
+  chính thức — Mammoth tự tuyên bố bỏ qua chi tiết định dạng để lấy HTML
+  ngữ nghĩa sạch; Tiptap ép nội dung qua schema JSON nên thành phần ngoài
+  schema bị loại. Mất mát hai chiều là **chắc chắn**, không phải rủi ro
+  mơ hồ. Đối sách kiến trúc (giữ file gốc trong IndexedDB, coi bản editor
+  là bản làm việc, cảnh báo khi xuất) trình bày ở TECH_SURVEY mục 4 —
+  chờ TASK-02 chốt.
+- **Trạng thái:** RESOLVED (2026-10-30, tại TASK-02) — **DEC-018** đã chốt
+  ở cấp phạm vi/kỳ vọng: chấp nhận mất định dạng, giữ file gốc làm tài sản
+  gốc, không ghi đè, cảnh báo người dùng trước khi xuất. Phần còn lại
+  (đo độ mất mát cụ thể trên tài liệu mẫu) là việc kiểm chứng đã lên lịch
+  trong tiêu chí nghiệm thu của TASK-07, không còn là vấn đề chưa rõ.
+
+## ISSUE-003 — Ảnh WMF/EMF trong DOCX không hiển thị trên trình duyệt
+- **Loại:** Không tương thích đã có bằng chứng thực tế.
+- **Mô tả:** Nhiều tài liệu Word (đặc biệt đề thi/tài liệu cũ) nhúng ảnh dạng
+  WMF/EMF. Trình duyệt web không hiển thị được hai định dạng này. Bằng chứng
+  từ dự án StudyWrite (2026-10-15): thư viện chuyển đổi DOCX cảnh báo
+  "Image of type image/x-wmf is unlikely to display in web browsers" và ảnh
+  bị hỏng trong bản hiển thị.
+- **Ảnh hưởng:** Word Engine — tài liệu có ảnh WMF/EMF sẽ thiếu hình.
+- **Hướng xử lý:** Cần chiến lược chuyển đổi WMF/EMF → PNG/SVG phía client
+  (thư viện/WASM) hoặc hiển thị placeholder có thông báo rõ; khảo sát ở TASK-01/07.
+- **Trạng thái:** OPEN (2026-10-30)
+
+## ISSUE-004 — Công thức toán OMML trong DOCX
+- **Loại:** Không tương thích đã có bằng chứng thực tế.
+- **Mô tả:** Công thức Word gốc dùng OMML; các thư viện chuyển DOCX→HTML phổ
+  biến (ví dụ Mammoth) không hỗ trợ OMML. Bằng chứng từ StudyWrite: phải tự
+  tiền xử lý chuyển OMML → MathML thì công thức mới hiển thị được, và ảnh
+  dạng VML (`w:pict`) bị tách khỏi dòng văn bản làm vỡ bố cục nếu không xử lý riêng.
+- **Ảnh hưởng:** Word Engine với tài liệu học tập có công thức.
+- **Hướng xử lý:** Đưa bộ chuyển OMML → MathML và xử lý VML vào phạm vi khảo
+  sát của TASK-01/TASK-07.
+- **Trạng thái:** OPEN (2026-10-30)
+
+## ISSUE-005 — Giới hạn dung lượng lưu trữ cục bộ của trình duyệt
+- **Loại:** Giới hạn nền tảng / chưa đo.
+- **Mô tả:** Local-first nghĩa là tài liệu + chú thích nằm trong IndexedDB;
+  quota khác nhau theo trình duyệt/thiết bị và có thể bị hệ điều hành thu hồi
+  khi máy thiếu dung lượng. Chưa đo được con số thực tế cho nhu cầu của sản phẩm.
+- **Ảnh hưởng:** Local Storage (TASK-08) và trải nghiệm offline dài hạn.
+- **Hướng xử lý:** Đo quota thực tế ở TASK-01/08; thiết kế cảnh báo dung lượng.
+- **Cập nhật TASK-02 (2026-10-30):** **DEC-022** đã chốt sao lưu/khôi phục
+  toàn thư viện + cảnh báo sao lưu định kỳ + xin `storage.persist()` —
+  giảm rủi ro *mất dữ liệu* khi bị eviction, nhưng **không** thay thế
+  việc đo quota thực tế và cảnh báo gần đầy ở TASK-08. Issue giữ OPEN.
+- **Trạng thái:** OPEN (2026-10-30)
+
+## ISSUE-006 — Hỗ trợ bút cảm ứng/pressure không đồng đều giữa các trình duyệt
+- **Loại:** Rủi ro kỹ thuật.
+- **Mô tả:** Pointer Events, `pressure`, sự kiện gộp (coalesced events) và
+  hành vi cuộn trang khi vẽ bằng cảm ứng khác nhau giữa Chrome/Edge/Safari/
+  Firefox và giữa Windows/Android/iOS. Kinh nghiệm từ StudyWrite: phải xử lý
+  riêng `touch-action` và độ phân giải canvas (DPR) thì nét bút mới không bị
+  trình duyệt "cướp" cử chỉ và đủ sắc.
+- **Ảnh hưởng:** Drawing Engine (TASK-05) — module quan trọng nhất của sản phẩm.
+- **Hướng xử lý:** Kiểm thử sớm trên thiết bị thật ở TASK-05; ghi ma trận
+  trình duyệt hỗ trợ vào tài liệu khảo sát.
+- **Trạng thái:** OPEN (2026-10-30)
+
+## ISSUE-007 — Phạm vi "sửa nội dung PDF gốc" chưa xác định
+- **Loại:** Quyết định còn thiếu.
+- **Mô tả:** DEC-005 chốt PDF gồm xem/viết/chú thích/xuất. Việc sửa trực tiếp
+  nội dung chữ/ảnh gốc trong PDF là bài toán khác hẳn (PDF không có mô hình
+  đoạn văn như Word) và chưa có quyết định có làm hay không, làm tới mức nào.
+- **Ảnh hưởng:** Phạm vi PDF Engine và kỳ vọng người dùng.
+- **Hướng xử lý:** Chủ dự án quyết định trước TASK-06; trước đó không cam kết
+  tính năng này trong PRODUCT_SPEC.md.
+- **Bằng chứng (TASK-01, 2026-10-30):** Tài liệu chính thức của pdf-lib
+  (mục Limitations) xác nhận không có API sửa/xóa text trên trang ngoài
+  form field; không thư viện JS client-side phổ biến nào làm được việc
+  này một cách tổng quát. Đề xuất đóng issue theo hướng: PDF = xem + chú
+  thích phủ + xuất flatten; "sửa chữ" nếu có chỉ là overlay che-và-viết-
+  lại. Chờ chủ dự án xác nhận ở TASK-02.
+- **Trạng thái:** RESOLVED (2026-10-30, tại TASK-02) — Chủ dự án đã xác
+  nhận tại **DEC-017**: PDF = xem + viết/chú thích phủ + lưu annotation
+  riêng + bảo vệ file gốc + xuất flatten; không cam kết sửa/xóa/thay thế
+  text gốc và không xuất annotation native của Acrobat.
+
+## ISSUE-008 — Hạ tầng dự án chưa có: Git, hosting, quy trình phát hành
+- **Loại:** Quyết định còn thiếu / thiết lập còn thiếu.
+- **Mô tả:** Thư mục `~/workspace/webscribble/` mới được tạo trong TASK-00 chỉ
+  để chứa `docs/`. Chưa khởi tạo Git repo, chưa chọn nơi lưu code từ xa, chưa
+  có hosting cho bản web. Việc kiểm tra trước TASK-00 xác nhận `~/workspace`
+  không phải Git repo và không có package.json nào thuộc WebScribble.
+- **Ảnh hưởng:** TASK-03 cần các quyết định này trước khi khởi tạo khung code.
+- **Hướng xử lý:** Chủ dự án quyết định (repo ở đâu, hosting nào) ở TASK-02/03.
+  Chỉ đề xuất nội dung commit; không tự commit khi chưa được yêu cầu.
+- **Cập nhật TASK-03 (2026-10-30):** Phần Git local **đã thực hiện**:
+  `git init` tại thư mục dự án, nhánh khởi tạo đổi tên thành `main`,
+  `.gitignore` chuẩn Vite/Node + bổ sung `.env*`; đã kiểm tra
+  `node_modules`/`dist` bị ignore đúng, **chưa có commit và chưa có
+  remote** (chờ chủ dự án duyệt commit đầu tiên). **Còn lại của issue:**
+  quyết định hosting (GitHub/GitLab/khác) và thời điểm kết nối remote —
+  chưa quyết.
+- **Trạng thái:** OPEN (2026-10-30) — đã thu hẹp còn phần hosting/remote.
+
+## ISSUE-009 — Quan hệ giữa WebScribble và StudyWrite hiện có chưa chốt
+- **Loại:** Quyết định còn thiếu.
+- **Mô tả:** Chủ dự án đang có StudyWrite — ứng dụng một file HTML mở/chỉnh
+  sửa DOCX kèm bút vẽ (Milestone 4), đã xử lý được một số vấn đề DOCX
+  (OMML → MathML, ảnh VML, chip cảnh báo WMF). Chưa rõ WebScribble là sản
+  phẩm thay thế/kế thừa StudyWrite, hay một sản phẩm độc lập; phần kinh
+  nghiệm/code nào của StudyWrite được phép mang sang cũng chưa có quyết định.
+- **Ảnh hưởng:** Phạm vi TASK-01 (có khảo sát lại từ đầu hay kế thừa kết quả
+  StudyWrite) và lộ trình Word Engine.
+- **Hướng xử lý:** Chủ dự án xác nhận trước hoặc trong TASK-01.
+- **Trạng thái:** RESOLVED (2026-10-30) — Chủ dự án đã chọn **Phương án C**
+  và ghi thành DEC-013: WebScribble độc lập về sản phẩm, được tận dụng có
+  chọn lọc module của StudyWrite sau khi đánh giá chất lượng, kiểm tra
+  quyền/nguồn gốc mã nguồn và khả năng tách module; không kế thừa mặc định
+  toàn bộ, không phụ thuộc bắt buộc. Việc đánh giá module thuộc phạm vi TASK-01.
+
+## ISSUE-010 — Xuất DOCX (export round-trip) chưa có giải pháp xác minh
+- **Loại:** Chưa xác minh.
+- **Mô tả:** Chưa xác định thư viện/chiến lược tạo file DOCX từ nội dung đã
+  sửa (và chú thích phủ lên) sao cho mở đúng trong Word; khác với hướng đọc
+  DOCX ở ISSUE-002. Chú thích dạng nét vẽ tay khi xuất sang DOCX sẽ ở dạng
+  gì (ảnh phủ? shape?) cũng chưa chốt.
+- **Ảnh hưởng:** Export Engine (TASK-09).
+- **Hướng xử lý:** Khảo sát ở TASK-01; chốt chiến lược ở TASK-02/TASK-07.
+- **Bằng chứng bổ sung (TASK-01, 2026-10-30):** Đã xác định được đường
+  xuất chính: tự map Tiptap JSON → thư viện `docx` (MIT) — cùng thư viện
+  StudyWrite đã dùng ở mức cơ bản (Luồng B, mục B9). Đường chính thức của
+  Tiptap là extension Pro trả phí (mâu thuẫn DEC-010 nếu dùng cho lõi).
+  Độ phủ định dạng của đường tự map cần prototype đo ở TASK-07 trước khi
+  cam kết.
+- **Trạng thái:** RESOLVED (2026-10-30, tại TASK-02) — **DEC-018** đã chốt
+  chiến lược xuất DOCX: tự map mô hình editor → thư viện `docx` (MIT),
+  không mua Tiptap Pro/Cloud. Độ phủ định dạng của bộ map sẽ đo bằng
+  prototype trong TASK-07 (việc đã lên lịch, không còn là khoảng trống
+  chiến lược).
+
+## ISSUE-011 — Cache tài nguyên lớn cho offline lần đầu
+- **Loại:** Rủi ro kỹ thuật.
+- **Mô tả:** Offline đầy đủ sau lần tải đầu đòi hỏi Service Worker cache toàn
+  bộ app + thư viện nặng (PDF.js worker, thư viện xử lý DOCX/WASM nếu có).
+  Lần tải đầu có thể chậm/nặng trên mạng yếu; cập nhật phiên bản mới phải
+  tránh làm hỏng cache đang dùng.
+- **Ảnh hưởng:** PWA/Offline (TASK-10) và ấn tượng lần đầu của người dùng.
+- **Hướng xử lý:** Đo dung lượng gói ở TASK-01; thiết kế chiến lược cache và
+  cập nhật ở TASK-10.
+- **Trạng thái:** OPEN (2026-10-30)
+
+## ISSUE-012 — Infinite Canvas cho Whiteboard Mode chưa được đánh giá
+- **Loại:** Chưa xác minh / quyết định còn thiếu.
+- **Mô tả:** Whiteboard Mode (DEC-014) có hướng nghiên cứu bảng trắng vô hạn
+  (Infinite Canvas). Chủ dự án đã lưu ý: **chưa được biến thành yêu cầu bắt
+  buộc** khi chưa đánh giá kỹ thuật (ảnh hưởng tới mô hình tọa độ, lưu trữ,
+  hiệu năng vẽ, xuất file).
+- **Ảnh hưởng:** Whiteboard Engine (TASK-12) và mô hình dữ liệu bề mặt.
+- **Hướng xử lý:** Đánh giá trong TASK-01; quyết định làm hay không ở TASK-02.
+  Trước khi có quyết định, đặc tả chỉ ghi ở mức "hướng nghiên cứu".
+- **Kết quả nghiên cứu (TASK-01, Luồng C, 2026-10-30):** Khuyến nghị
+  **không làm Infinite Canvas ở giai đoạn đầu** — Whiteboard dạng trang cố
+  định trước, nhưng thiết kế dữ liệu "sẵn sàng vô hạn" ngay từ TASK-02
+  (tọa độ float theo bề mặt, mọi stroke có bbox, camera tách khỏi dữ
+  liệu, Drawing Engine nhận transform). Khi đó nâng cấp sau này không
+  phải migration dữ liệu. Điều kiện để đảo ngược khuyến nghị đã ghi rõ
+  trong `docs/research/THREE_MODES_ARCHITECTURE_RESEARCH.md` mục 4.4.
+- **Trạng thái:** RESOLVED (2026-10-30, tại TASK-02) — **DEC-019** đã
+  quyết: giai đoạn đầu Whiteboard dùng trang cố định, chưa làm Infinite
+  Canvas; 4 điều kiện dữ liệu "sẵn sàng vô hạn" (tọa độ float theo bề
+  mặt, bbox cho mọi stroke, camera tách khỏi dữ liệu, Drawing Engine
+  nhận transform) đã thành yêu cầu kiến trúc bắt buộc trong
+  ARCHITECTURE.md mục 2.4. Issue mở lại nếu có quyết định triển khai
+  Infinite Canvas.
+
+## ISSUE-013 — Split Mode: cơ chế lưu trạng thái hai khu vực chưa thiết kế
+- **Loại:** Chưa xác minh / rủi ro mất dữ liệu.
+- **Mô tả:** Split Mode (DEC-014) gồm vùng tài liệu và vùng bảng trắng trong
+  cùng một workspace. Chưa rõ: trạng thái hai vùng được lưu chung hay riêng,
+  nhịp tự lưu khi người dùng viết ở cả hai vùng, và cách khôi phục workspace
+  sau khi đóng app sao cho không mất dữ liệu ở bất kỳ vùng nào.
+- **Ảnh hưởng:** TASK-13 (Split Mode), TASK-08 (Storage), mô hình dữ liệu.
+- **Hướng xử lý:** Khảo sát mô hình dữ liệu "surface" ở TASK-01, chốt ở TASK-02.
+- **Kết quả nghiên cứu (TASK-01, Luồng C, 2026-10-30):** Đã có mô hình đề
+  xuất: Workspace là thực thể IndexedDB độc lập **tham chiếu** hai bề
+  mặt; mỗi bề mặt tự chứa dữ liệu + trạng thái view của mình; tỷ lệ chia
+  thuộc workspace; **tự lưu theo bề mặt** khi stroke kết thúc (dữ liệu
+  mất tối đa là nét đang vẽ dở khi đóng đột ngột); **undo/redo tách riêng
+  theo bề mặt** (tránh hoàn tác nhầm vùng không nhìn thấy); bảng trắng
+  trong Split dùng chung kho thực thể với Whiteboard Mode. Chi tiết ở
+  `docs/research/THREE_MODES_ARCHITECTURE_RESEARCH.md` Phần 3.
+- **Trạng thái:** RESOLVED (2026-10-30, tại TASK-02) — Mô hình đã được
+  chốt tại **DEC-020** (Workspace tham chiếu hai Surface; tự lưu theo
+  Surface; Undo/Redo riêng theo Surface; khôi phục cả workspace) và phản
+  ánh trong ARCHITECTURE.md mục 2.2/2.4/6. Cài đặt và kiểm chứng thực tế
+  thuộc TASK-08/TASK-13.
+
+## ISSUE-014 — Ma trận khả năng theo định dạng cần chốt chi tiết
+- **Loại:** Quyết định còn thiếu.
+- **Mô tả:** DEC-014 yêu cầu phân biệt "sửa nội dung gốc" và "chú thích phủ"
+  theo từng định dạng (ma trận ban đầu ở PRODUCT_SPEC.md mục 3). Còn chưa rõ:
+  danh sách chính xác của "định dạng ảnh phổ biến khác" (ví dụ WebP, HEIC —
+  HEIC không hiển thị được trên nhiều trình duyệt); Split Mode trên mobile
+  hẹp sẽ bố trí hai vùng thế nào; xuất file từ Split Mode có gộp hai vùng
+  thành một file hay xuất riêng.
+- **Ảnh hưởng:** PRODUCT_SPEC (mục 3), TASK-06/07/09/13.
+- **Hướng xử lý:** Chủ dự án chốt dần; phần kỹ thuật (HEIC) khảo sát ở TASK-01.
+- **Kết quả nghiên cứu (TASK-01, Luồng C, 2026-10-30) — phần định dạng
+  ảnh đã rõ:** PNG/JPG/WebP/GIF hiển thị trực tiếp (WebP cần Safari ≥14 +
+  macOS Big Sur+); BMP hiển thị trực tiếp nhưng **không ưu tiên lưu trữ**
+  (không nén, tốn quota — chuyển PNG/WebP khi lưu); SVG hiển thị trực
+  tiếp ở chế độ ảnh an toàn (tắt script), chỉ khi inline sửa mới cần
+  sanitize; HEIC/HEIF **chỉ Safari ≥17 mở native**, trình duyệt khác cần
+  decoder WASM lazy-load (~1,2 MB, chưa xác minh độc lập) hoặc thông báo
+  cần chuyển đổi. Chi tiết: file Luồng C Phần 1.
+- **Còn mở sau nghiên cứu:** (1) phương án xuất file của Split Mode — đã
+  có 4 phương án A/B/C/D kèm ưu/nhược ở file Luồng C mục 3.3, chờ chủ dự
+  án chọn; (2) bố trí Split Mode trên mobile hẹp (orientation dọc đã có
+  trong mô hình workspace đề xuất nhưng chưa được chốt); (3) ngữ nghĩa
+  GIF làm nền tài liệu (animation chạy hay frame tĩnh).
+- **Cập nhật TASK-02 (2026-10-30):** Hai trong ba điểm còn mở đã được
+  quyết: xuất Split Mode = **phương án B** (DEC-021); HEIC = chưa tích
+  hợp decoder ở giai đoạn đầu, hiển thị thông báo chưa hỗ trợ (DEC-023).
+  **Phạm vi issue thu hẹp còn:** bố trí Split Mode trên mobile hẹp và
+  ngữ nghĩa GIF làm nền tài liệu — hai quyết định sản phẩm nhỏ, chốt
+  khi làm TASK-13/TASK-06.
+- **Trạng thái:** OPEN (2026-10-30) — phần kỹ thuật và 2/3 quyết định đã
+  có kết luận; còn 2 quyết định sản phẩm nhỏ nêu trên.
