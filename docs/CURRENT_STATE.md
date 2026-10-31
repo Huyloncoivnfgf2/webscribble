@@ -522,3 +522,14 @@ Xem KNOWN_ISSUES.md. Tóm tắt sau TASK-02:
   `Huyloncoivnfgf2/webscribble` đã đẩy xong
   2026-10-31), và các issue đã biết 003/004/
   005/014/015/016 theo KNOWN_ISSUES.md.
+
+- **Triển khai GitHub Pages: 2026-10-31.** Bản web
+  chạy tại https://Huyloncoivnfgf2.github.io/
+  webscribble/ qua workflow Actions
+  `.github/workflows/deploy-pages.yml` (push main →
+  npm ci → build → deploy). App chuyển sang base
+  `/webscribble/` (biến WS_BASE, mặc định trỏ Pages;
+  đặt `/` khi chạy gốc domain): vite base, manifest
+  dùng start_url/scope/icon tương đối, SW lấy
+  index theo scope của chính nó, đăng ký SW theo
+  BASE_URL. ISSUE-008 RESOLVED.

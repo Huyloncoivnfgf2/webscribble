@@ -174,7 +174,10 @@ Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RE
   GitHub `Huyloncoivnfgf2/webscribble` (public) đã nhận
   toàn bộ lịch sử qua git push SSH; chỉ còn chọn hosting
   cho bản web.
-- **Trạng thái:** OPEN (2026-10-30) — đã thu hẹp còn phần hosting.
+- **Trạng thái:** RESOLVED (2026-10-31) — Git local + remote
+  GitHub `Huyloncoivnfgf2/webscribble` + hosting GitHub
+  Pages tại https://Huyloncoivnfgf2.github.io/webscribble/
+  (Actions tự build + deploy mỗi lần push main).
 
 ## ISSUE-009 — Quan hệ giữa WebScribble và StudyWrite hiện có chưa chốt
 - **Loại:** Quyết định còn thiếu.

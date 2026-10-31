@@ -55,6 +55,10 @@ export function buildServiceWorkerSource({ version, precacheUrls }) {
 const VERSION = ${JSON.stringify(version)};
 const CACHE = 'webscribble-' + VERSION;
 const PRECACHE = ${JSON.stringify(precacheUrls, null, 2)};
+// Đường dẫn index trong phạm vi (scope) của chính SW —
+// chạy đúng cả ở gốc domain lẫn thư mục con như
+// /webscribble/ trên GitHub Pages:
+const INDEX_URL = new URL('index.html', self.registration.scope).pathname;
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -96,7 +100,7 @@ self.addEventListener('fetch', (event) => {
         // header "Vary: Origin" (may chu tinh pho bien) —
         // khong bo qua Vary thi ban cache khong khop voi
         // request cua trinh duyet va offline se gay.
-        const cached = await cache.match('/index.html', { ignoreVary: true });
+        const cached = await cache.match(INDEX_URL, { ignoreVary: true });
         if (cached) return cached;
         try {
           return await fetch(request);
@@ -126,13 +130,17 @@ self.addEventListener('fetch', (event) => {
 `
 }
 
-export function generateServiceWorker(distDir) {
+export function generateServiceWorker(distDir, base = '/') {
   const files = collectDistFiles(distDir)
   if (!files.includes('index.html')) {
     throw new Error(`generate-sw: ${distDir} không có index.html — hãy chạy vite build trước.`)
   }
   const version = computeVersion(distDir, files)
-  const precacheUrls = ['/', ...files.map((file) => `/${file}`)]
+  const normalizedBase = base.endsWith('/') ? base : `${base}/`
+  const precacheUrls = [
+    normalizedBase,
+    ...files.map((file) => `${normalizedBase}${file}`),
+  ]
   const source = buildServiceWorkerSource({ version, precacheUrls })
   writeFileSync(join(distDir, 'sw.js'), source)
   return { version, precacheCount: precacheUrls.length, fileCount: files.length }
@@ -142,8 +150,9 @@ const isMain = process.argv[1] !== undefined && import.meta.url === pathToFileUR
 if (isMain) {
   const distDir = join(fileURLToPath(import.meta.url), '..', '..', 'dist')
   void statSync(distDir)
-  const result = generateServiceWorker(distDir)
+  const base = process.env.WS_BASE ?? '/webscribble/'
+  const result = generateServiceWorker(distDir, base)
   console.log(
-    `sw.js: version ${result.version}, pre-cache ${result.precacheCount} URLs (${result.fileCount} files)`,
+    `sw.js: version ${result.version}, pre-cache ${result.precacheCount} URLs (${result.fileCount} files), base ${base}`,
   )
 }

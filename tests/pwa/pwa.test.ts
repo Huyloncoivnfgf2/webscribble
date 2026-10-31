@@ -28,8 +28,10 @@ describe('TASK-10 — manifest.webmanifest', () => {
     expect(manifest.short_name).toBe('WebScribble')
     expect(manifest.description).toContain('Write. Annotate. Edit. Anywhere.')
     expect(manifest.display).toBe('standalone')
-    expect(manifest.start_url).toBe('/')
-    expect(manifest.scope).toBe('/')
+    // start_url/scope tương đối (".") để chạy đúng cả ở
+    // gốc domain lẫn thư mục con /webscribble/:
+    expect(manifest.start_url).toBe('.')
+    expect(manifest.scope).toBe('.')
     expect(manifest.theme_color).toMatch(/^#[0-9A-Fa-f]{6}$/)
     expect(manifest.background_color).toMatch(/^#[0-9A-Fa-f]{6}$/)
   })
@@ -67,7 +69,7 @@ interface SwGenerator {
   collectDistFiles(dir: string): string[]
   computeVersion(dir: string, files: string[]): string
   buildServiceWorkerSource(input: { version: string; precacheUrls: string[] }): string
-  generateServiceWorker(dir: string): { version: string; precacheCount: number }
+  generateServiceWorker(dir: string, base?: string): { version: string; precacheCount: number }
 }
 
 const generator = (await import('../../scripts/generate-sw.mjs')) as unknown as SwGenerator
@@ -109,6 +111,16 @@ describe('TASK-10 — generate-sw', () => {
     expect(generator.computeVersion(dir, files)).toBe(v1)
     writeFileSync(join(dir, 'assets', 'index-abc.js'), 'console.log(2)')
     expect(generator.computeVersion(dir, files)).not.toBe(v1)
+  })
+
+  it('base path được tiền tố vào mọi URL pre-cache (GitHub Pages /webscribble/)', () => {
+    const dir = makeDistFixture()
+    generator.generateServiceWorker(dir, '/webscribble/')
+    const sw = readFileSync(join(dir, 'sw.js'), 'utf8')
+    expect(sw).toContain('"/webscribble/index.html"')
+    expect(sw).toContain('"/webscribble/assets/pdf.worker.min-xyz.mjs"')
+    // Điều hướng dự phòng theo scope của SW, không khóa cứng '/index.html':
+    expect(sw).toContain('INDEX_URL')
   })
 
   it('báo lỗi rõ ràng khi dist thiếu index.html', () => {

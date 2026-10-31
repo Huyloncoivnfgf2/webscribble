@@ -69,7 +69,11 @@ export async function registerServiceWorker(
     deps.onUpdateAvailable?.()
   }
   try {
-    const registration = await container.register(deps.scriptURL ?? '/sw.js')
+    // Đường dẫn SW theo base của bản build (ví dụ
+    // '/webscribble/sw.js' trên GitHub Pages, '/sw.js'
+    // ở gốc domain) — BASE_URL do Vite cung cấp:
+    const scriptURL = deps.scriptURL ?? `${import.meta.env.BASE_URL}sw.js`
+    const registration = await container.register(scriptURL)
     waitingRegistration = registration
     if (registration.waiting !== null && container.controller !== null) {
       notify()

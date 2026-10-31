@@ -5,6 +5,17 @@
 
 ## Lịch sử
 
+### Triển khai — 2026-10-31 — GitHub Pages (HTTPS)
+
+- WebScribble v1.0.0 chạy chính thức tại
+  https://Huyloncoivnfgf2.github.io/webscribble/
+  qua GitHub Actions (mỗi push lên main tự build
+  và deploy). Chuyển toàn app sang base path
+  `/webscribble/` (WS_BASE): Vite base, manifest
+  tương đối, Service Worker nhận diện scope của
+  chính nó — PWA cài đặt và chạy offline ngay
+  trên địa chỉ Pages. ISSUE-008 khép lại.
+
 ### MVP v1.0.0 — 2026-10-31 — PHÁT HÀNH BẢN MVP
 
 - **Cột mốc:** toàn bộ roadmap MVP (TASK-00 →
