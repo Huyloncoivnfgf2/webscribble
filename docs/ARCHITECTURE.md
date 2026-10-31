@@ -103,6 +103,150 @@ cầu bắt buộc (DEC-022).
 - Riêng iOS: hướng dẫn Add to Home Screen trong onboarding để tránh quy
   tắc ITP xóa storage sau 7 ngày (DEC-022).
 
+### 2.6 Drawing Engine — mô hình dữ liệu (đã triển khai ở TASK-05A)
+
+Nền dữ liệu của Drawing Engine nằm ở `src/engines/drawing/`, độc lập
+hoàn toàn với renderer và input (chưa triển khai):
+
+- **`types.ts`** — `DrawingObject` là discriminated union theo trường
+  `type`: `pen`/`highlighter` (nét tự do: `points` là raw StrokePoint
+  gồm x, y, pressure, time + StrokeStyle), `line`/`rectangle`/`ellipse`/
+  `arrow` (start/end + ShapeStyle), `text` (position, nội dung, width/
+  height + TextStyle). Mọi object có `id`, `surfaceId`, `bounds`,
+  `createdAt`, `updatedAt`. Tọa độ là **world coordinates** của bề mặt.
+  Không lưu outline, không lưu bitmap.
+- **`objects.ts`** — factory cho từng loại (tự tính bounds, tự sinh ID
+  bằng `crypto.randomUUID()` có dự phòng), style mặc định cho từng công cụ.
+- **`geometry.ts`** — tính bounds (nét vẽ nới bằng nửa độ dày), union/
+  expand/intersect/contains, `computeObjectBounds` để kiểm chứng.
+- **`coordinates.ts`** — `Camera {x, y, zoom}` là trạng thái hiển thị
+  tách khỏi dữ liệu; `worldToScreen`/`screenToWorld` và pan/zoom giữ
+  điểm neo — điều kiện của DEC-019 để sau này mở Infinite Canvas không
+  phải đổi dữ liệu.
+- **`validation.ts`** — `validateDrawingObject` kiểm tra cấu trúc + tính
+  nhất quán (bounds khớp dữ liệu, pressure trong [0,1], time không giảm
+  — quy ước time tương đối đã chốt ở DEC-025) cho dữ liệu nạp từ
+  persistence/sao lưu.
+- **`surface.ts`** — interface `DrawingSurface` (id, kind
+  `document-page`/`whiteboard`, size, list/get/add/**update**/remove/
+  clear) là hợp đồng duy nhất giữa Drawing Engine và engine sở hữu bề
+  mặt; addObject từ chối object thuộc bề mặt khác (cô lập theo DEC-020).
+  Nhóm phương thức cập nhật (bổ sung 2026-10-31 theo yêu cầu chủ dự án):
+  `updateObject` — thay một object cùng ID (không đổi được ID/surfaceId,
+  dữ liệu được validate trước khi ghi, surface tự cập nhật `updatedAt`,
+  thất bại thì object gốc còn nguyên); `updateObjects` — cập nhật nhiều
+  object **nguyên tử** (kiểm tra tất cả rồi mới ghi); `replaceObject` —
+  thay nguyên tử một object bằng 0..N object mới có ID mới, phục vụ
+  Segment Eraser. `InMemorySurface` là bản cài đặt working set.
+- Mọi object là dữ liệu thuần tuần tự hóa được (đã kiểm chứng bằng test
+  JSON round-trip) → sẵn sàng cho persistence (TASK-08), undo/redo
+  (snapshot theo surface) và selection/eraser (dựa trên bounds + id).
+  Object `text` tự mang width/height theo DEC-026; test chạy bằng
+  Vitest theo DEC-024.
+- **`input.ts`** — Input Manager (TASK-05B): tầng DUY NHẤT tiếp nhận
+  Pointer Events cho cả 3 chế độ. Chuẩn hóa sự kiện thô (qua interface
+  cấu trúc tối thiểu `PointerEventLike`/`PointerTargetLike`, không phụ
+  thuộc DOM hay engine tài liệu) thành `PointerSample` gồm vị trí
+  **world** (client → trừ góc phần tử → `screenToWorld` bằng Camera
+  hiện tại, lấy qua callback `getCamera` cho mỗi sự kiện), pressure và
+  tiltX/tiltY đã chuẩn hóa kèm fallback theo thiết bị (không dữ liệu
+  lực khi đang nhấn → 0.5; riêng bút giữ giá trị thật kể cả 0). Chỉ
+  theo dõi MỘT pointer chính tại một thời điểm (bỏ qua pointer thứ
+  hai/non-primary/nút phụ — không có multi-touch gesture), set pointer
+  capture khi down và giải phóng khi up/cancel (lỗi capture không làm
+  hỏng luồng), mở rộng `pointermove` thành các sample coalesced khi
+  trình duyệt hỗ trợ. Manager không vẽ, không tạo DrawingObject,
+  không quản lý history — chỉ phát `PointerInputEvent` (down/move/up/
+  cancel) qua callback cho tầng xây nét. Có thêm `reset()` để tầng
+  trên đổi ngữ cảnh giữa thao tác (bổ sung ở TASK-05C).
+- **`strokeBuilder.ts`** — Stroke Builder (TASK-05C): biến chuỗi
+  PointerInputEvent thành StrokeObject hoàn chỉnh qua factory của
+  TASK-05A. Quy tắc: `down` mở nét (sinh ID ngay để preview và object
+  cuối cùng chung ID), `up` hoàn tất; `cancel` hoàn tất và GIỮ nét
+  (kèm `endedBy` trong kết quả); `down` mới giữa nét thì hoàn tất nét
+  cũ với `endedBy: 'interrupted'`; time chuẩn hóa tương đối và không
+  giảm dần (DEC-025 + điều kiện validation); điểm trùng hoàn toàn bị
+  bỏ qua. Có `previewObject()` cho render trực tiếp và `abandon()` là
+  đường hủy nét tường minh duy nhất.
+- **`renderer.ts`** — Stroke Renderer (TASK-05C): tính outline lúc
+  render bằng perfect-freehand (DEC-016) từ raw points đã biến đổi
+  qua camera (size nhân zoom) rồi fill lên Canvas 2D; pen biến thiên
+  độ dày theo pressure (thinning 0.5), highlighter dày đều (thinning
+  0) + opacity từ style; chỉ đọc object, không sửa dữ liệu nguồn.
+- **`canvasRenderer.ts`** — Canvas Renderer (TASK-05C): vẽ lại toàn
+  cảnh từ dữ liệu (`getObjects` + `getPreviewObjects`) theo lịch
+  requestAnimationFrame có gộp yêu cầu; quản lý resize + DPR (backing
+  store = CSS × DPR, vẽ theo transform DPR nên tọa độ không lệch);
+  `dispose()` hủy frame đang chờ. Một instance cho một canvas — mô
+  hình 2 lớp canvas của mục 2.3 dùng hai instance (nét đã chốt / nét
+  đang vẽ) khi tầng view cần tối ưu.
+- **`engine.ts`** — DrawingEngine (TASK-05C): điểm tích hợp duy nhất
+  Input Manager → Stroke Builder → Surface + CanvasRenderer cho một
+  bề mặt; đổi công cụ/detach giữa nét thì chốt nét vào Surface và
+  reset Input Manager. Mỗi bề mặt một instance (Split = 2 instance).
+- **`shapeBuilder.ts`** — Shape Builder (TASK-05D): biến chuỗi
+  PointerInputEvent thành ShapeObject (line/rectangle/ellipse/arrow)
+  qua factory; vòng đời và chính sách gián đoạn cùng họ StrokeBuilder
+  (cancel giữ hình, down mới chốt hình cũ). Chính sách hình suy biến
+  khi hoàn tất: line/arrow có độ dài < minSize (mặc định 2 world
+  units) hoặc rectangle/ellipse có một chiều < minSize → bị loại
+  (`discarded`); preview trong lúc kéo không bị ảnh hưởng.
+- **`text.ts`** — Text Engine (TASK-05D): tạo/cập nhật TextObject
+  theo DEC-026 — nội dung thật + width/height do một `TextMeasurer`
+  được tiêm vào đo tại thời điểm tạo/sửa (bản Canvas dùng
+  measureText; bản kiểm thử là hàm đo xác định). Chia dòng: ngắt '\n'
+  + gói từ tham lam theo maxWidth; một từ dài hơn maxWidth giữ
+  nguyên. Nội dung rỗng bị từ chối. Cập nhật nội dung trả về object
+  mới (giữ id/createdAt/vị trí) để dùng với `surface.updateObject`.
+- **Renderer từ TASK-05D** vẽ mọi loại object qua `drawObject`:
+  hình vector vẽ từ start/end + ShapeStyle (arrow có đầu tam giác
+  đặc tính bằng hàm hình học thuần `arrowHeadPoints`), text vẽ bằng
+  fillText theo cùng thuật toán chia dòng của Text Engine, clip
+  trong hộp width × height của object, font phóng theo zoom.
+  CanvasRenderer vì thế redraw được toàn bộ Surface gồm cả 7 loại
+  object. DrawingEngine (05D) điều phối cả StrokeBuilder và
+  ShapeBuilder theo công cụ hiện tại; công cụ 'text' phát callback
+  yêu cầu vị trí đặt text cho tầng view, và `addTextObject` tạo
+  TextObject qua Text Engine (measurer tiêm vào hoặc tự tạo từ
+  canvas của engine).
+- **`selection.ts`** — Selection Engine (TASK-05E): chọn object bằng
+  vùng chữ nhật (`RectSelectionBuilder`) hoặc lasso tự do
+  (`LassoSelectionBuilder`); kết luận giao nhau bằng HÌNH HỌC THẬT
+  hai tầng (lọc ứng viên bằng bounds → kiểm tra theo loại: polyline
+  có bán kính mực / polygon vùng kín / ellipse xấp xỉ polygon / tam
+  giác đầu mũi tên), không kết luận chỉ từ bounding box. Lasso tự
+  cắt bị từ chối tường minh. Di chuyển: `translateObject` (thuần) +
+  `moveObjects` ghi nguyên tử qua `updateObjects`.
+- **`eraser.ts`** — Eraser Engine (TASK-05E): Stroke Eraser xóa toàn
+  bộ nét khi đường tẩy chạm nét (khoảng cách đoạn–đoạn thật + nửa độ
+  dày nét); Segment Eraser cắt phần nét trong hình tròn tẩy bằng
+  hình học đoạn–tròn (điểm biên nội suy vị trí/áp suất/thời gian),
+  đoạn còn lại tạo object mới và thay thế nguyên tử qua
+  `replaceObject`. Cả hai chỉ tác động pen/highlighter.
+- **Sửa bounds (TASK-05E):** bounds của hình hai điểm nay gồm nửa độ
+  dày nét (`shapeObjectBounds`), bounds của arrow gồm cả đầu mũi tên
+  (`arrowBounds`, hình học `arrowHeadPoints`/`arrowHeadLength` chuyển
+  về geometry.ts; renderer vẽ đầu mũi tên theo đơn vị world để khớp
+  bounds ở mọi zoom). Bounds của mọi object = phạm vi mực vẽ thật —
+  tiền đề để selection/eraser lọc ứng viên an toàn. CanvasRenderer có
+  thêm lớp phủ `getOverlay` (vùng chọn, khung object đã chọn, con trỏ
+  tẩy) vẽ sau mọi object.
+- **`history.ts`** — History Manager (TASK-05F): Undo/Redo theo
+  Command Pattern với MỘT command tổng quát `SurfaceChangeCommand` —
+  mọi thao tác quy về một `SurfaceChange` (danh sách object bị ảnh
+  hưởng kèm vị trí, ở trạng thái trước và sau). Các hàm `perform*`
+  (add/remove/update/replace/move) thực thi thao tác bằng API Surface
+  thường và chụp lại thay đổi từ trạng thái thật. Undo/redo là hoán
+  đổi trạng thái NGUYÊN BẢN bằng removeObject + `insertObjectAt`
+  (không chạy lại logic, không tạo ID mới, không làm mới updatedAt).
+  `HistoryManager` gắn đúng một Surface (Split = hai manager độc
+  lập), giới hạn mặc định 100 command, vượt giới hạn loại command cũ
+  nhất. DrawingEngine ghi mọi thao tác qua history; một lần kéo tẩy
+  liên tục được engine gom thành một command từ khung trạng thái đầu
+  lần tẩy. Surface bổ sung `insertObjectAt` (chèn nguyên bản tại vị
+  trí) và `replaceObject` giữ vị trí của object bị thay — hai điều
+  kiện cần để khôi phục đúng thứ tự vẽ.
+
 ## 3. Cấu trúc thư mục dự kiến (khi bắt đầu code — TASK-03)
 
 ```

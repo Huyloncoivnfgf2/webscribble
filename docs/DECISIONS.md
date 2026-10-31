@@ -276,3 +276,53 @@
 - **Phạm vi:** Document Mode cho tài liệu ảnh (TASK-06 phạm vi ảnh).
 - **Ngày:** 2026-10-30 · **Trạng thái:** ACTIVE
 - **Hệ quả:** Giải quyết phần "HEIC" của ISSUE-014.
+
+---
+
+## Nhóm quyết định bổ sung — ghi nhận 2026-10-31 (chủ dự án phê duyệt các đề xuất từ TASK-05A)
+
+### DEC-024 — Vitest là test runner chính thức (từ PROP-001)
+- **Nội dung:** Vitest là test runner chính thức của dự án (bản cài đầu
+  tiên: 5.0.5, MIT). Unit test đặt trong thư mục `tests/`, chạy bằng
+  `npm run test`; task có logic thuần phải kèm unit test.
+- **Lý do:** Tích hợp tự nhiên với Vite/TypeScript/ESM của dự án
+  (DEC-016), không cần cấu hình thêm; đã kiểm chứng thực tế ở TASK-05A
+  (48 test đạt ngay lần chạy đầu).
+- **Phạm vi:** Toàn dự án, từ TASK-05A trở đi.
+- **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
+
+### DEC-025 — Quy ước thời gian của StrokePoint: mili-giây tương đối (từ PROP-002)
+- **Nội dung:** Trường `time` của mỗi điểm trong một nét vẽ là số
+  mili-giây **tương đối kể từ điểm đầu tiên của nét đó** (điểm đầu = 0)
+  và không giảm dần trong cùng một nét. Đây là một phần của định dạng
+  dữ liệu nét vẽ — thay đổi quy ước này sau này phải có migration.
+- **Lý do:** Đủ để tái hiện tốc độ/áp lực khi render và phát lại nét;
+  nhỏ gọn, không phụ thuộc đồng hồ hệ thống, ổn định khi lưu trữ và sao
+  lưu (DEC-022).
+- **Phạm vi:** Mô hình dữ liệu Drawing Engine (TASK-05) và persistence
+  (TASK-08).
+- **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
+
+### DEC-026 — TextObject tự mang kích thước vùng chứa (từ PROP-003)
+- **Nội dung:** Object `text` lưu `width`/`height` của vùng chứa văn
+  bản; lớp tạo/sửa text chịu trách nhiệm đo và cập nhật hai giá trị
+  này. Tầng dữ liệu của Drawing Engine **không tự đo văn bản**.
+- **Lý do:** Nhờ vậy bounds của text luôn tính và kiểm chứng được ngay
+  ở tầng dữ liệu (validation đối chiếu bounds), không phụ thuộc
+  renderer/canvas — đo text cần ngữ cảnh đồ họa mà tầng dữ liệu không có.
+- **Phạm vi:** Mô hình dữ liệu Drawing Engine (TASK-05) và công cụ text
+  ở các task sau.
+- **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
+
+---
+
+## Đề xuất chờ xác nhận — CHƯA PHẢI QUYẾT ĐỊNH
+
+> Các mục dưới đây do trợ lý đề xuất trong quá trình triển khai, **chưa
+> được chủ dự án phê duyệt**. Chúng không có hiệu lực như DEC ở trên;
+> khi được xác nhận sẽ chuyển thành DEC với số thứ tự tiếp nối.
+
+- PROP-001, PROP-002, PROP-003 (đề xuất tại TASK-05A, 2026-10-31) đã
+  được chủ dự án **phê duyệt ngày 2026-10-31** và chuyển thành quyết
+  định chính thức **DEC-024, DEC-025, DEC-026** ở trên.
+- (Chưa có đề xuất nào khác đang chờ.)

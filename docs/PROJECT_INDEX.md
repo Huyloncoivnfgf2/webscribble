@@ -11,9 +11,12 @@
   Ba chế độ làm việc: Document Mode, Split Mode, Whiteboard Mode (DEC-014).
 - **Thư mục gốc dự án:** `~/workspace/webscribble/`
 - **Trạng thái:** Đã xong TASK-00 → TASK-04 (bộ nhớ, khảo sát, chốt kiến
-  trúc DEC-016 → 023, khung dự án, UI shell + điều hướng). Đã có giao
-  diện khung hoàn chỉnh ở mức UI — **chưa có engine/chức năng xử lý tài
-  liệu**; bước tiếp theo là TASK-05 (Drawing Engine).
+  trúc DEC-016 → 023, khung dự án, UI shell). TASK-05 (Drawing Engine)
+  đang thực hiện — **pha 05A (mô hình dữ liệu), 05B (Input Manager),
+  05C (Stroke Engine & Renderer), 05D (Shape & Text Engine) và 05E
+  (Selection & Eraser), 05F (History Manager) và 05G (Integration
+  & Testing) đã xong**; chưa có trang thử nghiệm chính thức và
+  chưa có engine tài liệu.
 
 ## 2. Bản đồ tài liệu (thư mục `docs/`)
 
@@ -47,15 +50,22 @@ toàn bộ lịch sử hội thoại.
 
 ## 4. Task hiện tại
 
-- **Vừa hoàn thành:** TASK-04 — UI shell & điều hướng cơ bản (đã kiểm
-  chứng bằng trình duyệt headless 3 kích thước màn hình). Trước đó:
-  TASK-03 (khung dự án), TASK-02 (chốt kiến trúc), TASK-01, TASK-00.
-- **Đang thực hiện:** (chưa có — chờ chủ dự án giao task tiếp theo)
-- **Kế tiếp dự kiến:** TASK-05 — Drawing Engine (lõi viết tay, DEC-015).
+- **Vừa hoàn thành:** TASK-05G — Integration & Testing của
+  Drawing Engine (48 test mới, tổng 321 đạt; sửa bug StrokeBuilder
+  đánh rơi điểm nhả bút; Chromium headless 16/16). Trước đó:
+  TASK-05F (History Manager), TASK-05E (Selection & Eraser),
+  TASK-05D (Shape & Text Engine), TASK-05C (Stroke Engine &
+  Renderer), TASK-05B (Input Manager), TASK-05A (Data Model &
+  Surface Interface), TASK-04 (UI shell, commit `b4aa4ae`), TASK-03,
+  TASK-02, TASK-01, TASK-00.
+- **Đang thực hiện:** TASK-05 — Drawing Engine (phần engine đã
+  xong gồm kiểm thử tích hợp; còn kiểm chứng thiết bị thật — chờ
+  phần cứng).
+- **Kế tiếp dự kiến:** TASK-06 — PDF Engine (chờ giao).
 - Chi tiết trạng thái: `CURRENT_STATE.md`. Không tự ý bắt đầu task mới.
 
 ## 5. Phiên bản tài liệu
 
-- **Docs version:** 1.5
+- **Docs version:** 1.13
 - **Ngày cập nhật:** 2026-10-30
 - **Task tạo:** TASK-00

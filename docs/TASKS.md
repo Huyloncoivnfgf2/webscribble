@@ -123,10 +123,70 @@
   tràn ngang, drawer mobile đóng/mở và điều hướng đúng, chọn Split Mode
   đổi xem trước + trạng thái active, thông báo ở trang Tài liệu xuất
   hiện, **không lỗi console**. `lint`/`build` đạt. Chi tiết: CHANGELOG.md
-  mục TASK-04. Thay đổi chưa commit (chờ chủ dự án duyệt).
+  mục TASK-04. Đã commit ngày 2026-10-30: `b4aa4ae` "feat: build
+  WebScribble UI shell and navigation".
 
 ## TASK-05 — Drawing Engine
-- **Trạng thái:** NOT_STARTED
+- **Trạng thái:** IN_PROGRESS
+- **Tiến độ:** **Pha 05A (Data Model & Surface Interface) — DONE ngày
+  2026-10-31.** Đã có trong `src/engines/drawing/`: types (DrawingObject
+  union 7 loại), factories + sinh ID, geometry (bounds), coordinates
+  (Camera tách khỏi dữ liệu + biến đổi world↔screen), validation,
+  DrawingSurface + InMemorySurface; 48 unit test đạt (`tests/drawing/`).
+  **Bổ sung 2026-10-31 (chủ dự án yêu cầu):** nhóm phương thức cập nhật
+  của DrawingSurface — `updateObject`, `updateObjects` (nguyên tử),
+  `replaceObject` (nguyên tử, cho Segment Eraser) — kèm 13 unit test
+  mới (tổng 61 test đạt). Cùng ngày, 3 đề xuất của 05A được chủ dự án
+  phê duyệt thành **DEC-024** (Vitest), **DEC-025** (StrokePoint.time
+  tương đối), **DEC-026** (TextObject tự mang width/height).
+  **Pha 05B (Input Manager) — DONE ngày 2026-10-31:** `input.ts` —
+  PointerInputManager dùng Pointer Events cho mouse/touch/pen, chuẩn
+  hóa tọa độ về world qua Camera, pressure/tilt kèm fallback, pointer
+  capture, chỉ một pointer hoạt động tại một thời điểm, mở rộng
+  coalesced events khi trình duyệt hỗ trợ; 25 unit test mới (tổng 86
+  test đạt). Chi tiết: CHANGELOG.md mục TASK-05B.
+  **Pha 05C (Stroke Engine & Renderer) — DONE ngày 2026-10-31:**
+  `strokeBuilder.ts` (nét từ PointerInputEvent, cancel giữ nét, time
+  tương đối không giảm), `renderer.ts` (outline bằng perfect-freehand
+  1.2.3 — cài theo DEC-016), `canvasRenderer.ts` (rAF gộp frame, DPR,
+  resize, redraw từ dữ liệu), `engine.ts` (DrawingEngine tích hợp:
+  input → builder → surface + renderer); Input Manager bổ sung
+  `reset()`. 38 unit test mới (tổng 124 test đạt).
+  **Pha 05D (Shape & Text Engine) — DONE ngày 2026-10-31:**
+  `shapeBuilder.ts` (4 loại hình, chính sách loại hình suy biến khi
+  hoàn tất), `text.ts` (Text Engine: layout + đo qua TextMeasurer
+  tiêm vào, DEC-026, từ chối text rỗng), renderer mở rộng `drawShape`/
+  `drawText`/`drawObject` vẽ đủ 7 loại, CanvasRenderer bỏ bộ lọc chỉ
+  vẽ nét, DrawingEngine thêm công cụ hình + text (callback đặt text +
+  `addTextObject`). 42 unit test mới (tổng 166 test đạt).
+  **Pha 05E (Selection & Eraser) — DONE ngày 2026-10-31:**
+  `selection.ts` (chọn rect/lasso với giao nhau hình học thật hai
+  tầng, lasso tự cắt bị từ chối, di chuyển nhiều object nguyên tử qua
+  updateObjects), `eraser.ts` (Stroke Eraser theo khoảng cách thật;
+  Segment Eraser cắt nét bằng hình học đoạn–tròn, thay thế nguyên tử
+  qua replaceObject), sửa bounds ở geometry/factory để bounds = phạm
+  vi mực thật (hình gồm nửa độ dày nét; arrow gồm đầu mũi tên —
+  đầu mũi tên chuyển sang đơn vị world), CanvasRenderer thêm lớp phủ
+  overlay, DrawingEngine thêm công cụ select-rect/select-lasso/
+  stroke-eraser/segment-eraser + moveSelectionBy/deleteSelection.
+  74 unit test mới (tổng 240 test đạt).
+  **Pha 05F (History Manager) — DONE ngày 2026-10-31:** `history.ts`
+  (SurfaceChangeCommand tổng quát + performer add/remove/update/
+  replace/move + HistoryManager riêng theo Surface, giới hạn mặc
+  định 100 command), Surface bổ sung `insertObjectAt` và
+  `replaceObject` giữ vị trí, DrawingEngine tích hợp undo/redo cho
+  mọi thao tác (một lần kéo tẩy = một command). 33 unit test mới
+  (tổng 273 test đạt).
+  **Pha 05G (Integration & Testing) — DONE ngày 2026-10-31:** kiểm
+  thử tích hợp toàn diện (48 test mới, tổng 321 test đạt): mọi công
+  cụ, selection/eraser trên cảnh chồng nhau, chuỗi history hỗn hợp,
+  vòng đời pointer, cô lập hai engine (Split), stress render/
+  selection/history và kiểm chứng trình duyệt Chromium headless
+  (16/16). Phát hiện và sửa 1 bug thật: StrokeBuilder đánh rơi điểm
+  nhả bút (xem CHANGELOG). Chưa kiểm chứng thiết bị thật/Safari —
+  phần còn mở của ISSUE-006, không chặn các task engine tiếp theo.
+  Chưa làm: trang thử nghiệm chính thức — thuộc phạm vi UI sau này,
+  chờ chủ dự án giao.
 - **Mục tiêu:** Canvas vẽ độc lập: bút, highlight, tẩy, nhiều màu/độ dày,
   hỗ trợ stylus + pressure (nếu trình duyệt hỗ trợ), làm mượt nét, undo/redo.
   Đây là engine vẽ **duy nhất** phục vụ cả 3 chế độ làm việc (DEC-015) —

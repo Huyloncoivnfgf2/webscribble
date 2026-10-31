@@ -100,7 +100,20 @@ Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RE
 - **Ảnh hưởng:** Drawing Engine (TASK-05) — module quan trọng nhất của sản phẩm.
 - **Hướng xử lý:** Kiểm thử sớm trên thiết bị thật ở TASK-05; ghi ma trận
   trình duyệt hỗ trợ vào tài liệu khảo sát.
-- **Trạng thái:** OPEN (2026-10-30)
+- **Tiến triển:** TASK-05B (2026-10-31) đã triển khai ở tầng code các
+  cơ chế giảm rủi ro: feature-detect `getCoalescedEvents` (không có thì
+  dùng sự kiện gốc), chuẩn hóa pressure/tilt kèm fallback theo loại
+  thiết bị. TASK-05C (2026-10-31): CanvasRenderer xử lý DPR tập trung
+  (backing store = CSS × DPR + transform) nên phần "độ sắc nét/DPR"
+  của issue đã có lời giải ở tầng engine. TASK-05G (2026-10-31) đã
+  kiểm chứng bằng trình duyệt Chromium headless THẬT (không phải
+  thiết bị thật): chuột và chạm (CDP touch) vẽ đúng tọa độ ở DPR 1
+  và DPR 2, trang không cuộn khi vẽ với `touch-action: none` ở tầng
+  view, undo/redo vẽ lại đúng (16/16 kiểm tra đạt; harness tạm đã
+  xóa sau khi đo). Phần còn lại — bút stylus thật, Safari/iPadOS và
+  thiết bị cảm ứng thật — vẫn chưa kiểm chứng được trong môi trường
+  hiện tại.
+- **Trạng thái:** OPEN (2026-10-30; cập nhật tiến triển 2026-10-31)
 
 ## ISSUE-007 — Phạm vi "sửa nội dung PDF gốc" chưa xác định
 - **Loại:** Quyết định còn thiếu.
