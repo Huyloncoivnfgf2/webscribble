@@ -518,5 +518,7 @@ Xem KNOWN_ISSUES.md. Tóm tắt sau TASK-02:
 - Việc còn mở sau phát hành (không chặn MVP):
   vòng nghiệm thu thiết bị thật cho TASK-11
   (ISSUE-006), quyết định hosting/remote
-  (ISSUE-008), và các issue đã biết 003/004/
+  (phần hosting của ISSUE-008; remote GitHub
+  `Huyloncoivnfgf2/webscribble` đã đẩy xong
+  2026-10-31), và các issue đã biết 003/004/
   005/014/015/016 theo KNOWN_ISSUES.md.

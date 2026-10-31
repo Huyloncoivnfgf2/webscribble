@@ -170,7 +170,11 @@ Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RE
   remote** (chờ chủ dự án duyệt commit đầu tiên). **Còn lại của issue:**
   quyết định hosting (GitHub/GitLab/khác) và thời điểm kết nối remote —
   chưa quyết.
-- **Trạng thái:** OPEN (2026-10-30) — đã thu hẹp còn phần hosting/remote.
+- **Cập nhật (2026-10-31):** phần remote đã xong — repo
+  GitHub `Huyloncoivnfgf2/webscribble` (public) đã nhận
+  toàn bộ lịch sử qua git push SSH; chỉ còn chọn hosting
+  cho bản web.
+- **Trạng thái:** OPEN (2026-10-30) — đã thu hẹp còn phần hosting.
 
 ## ISSUE-009 — Quan hệ giữa WebScribble và StudyWrite hiện có chưa chốt
 - **Loại:** Quyết định còn thiếu.
