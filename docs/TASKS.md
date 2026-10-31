@@ -127,7 +127,8 @@
   WebScribble UI shell and navigation".
 
 ## TASK-05 — Drawing Engine
-- **Trạng thái:** IN_PROGRESS
+- **Trạng thái:** DONE (05A–05G hoàn thành 2026-10-31;
+  đã commit `7aa608e` "feat: complete drawing engine")
 - **Tiến độ:** **Pha 05A (Data Model & Surface Interface) — DONE ngày
   2026-10-31.** Đã có trong `src/engines/drawing/`: types (DrawingObject
   union 7 loại), factories + sinh ID, geometry (bounds), coordinates
@@ -199,29 +200,238 @@
   tablet; nét vẽ lại đúng vị trí sau zoom; engine không import module tài liệu.
 
 ## TASK-06 — PDF Engine: xem & chú thích
-- **Trạng thái:** NOT_STARTED
+- **Trạng thái:** DONE ngày 2026-10-31 — cả 6 subtask 06A → 06F
+  đã hoàn thành (chi tiết từng subtask bên dưới; TASK-06F là vòng
+  kiểm thử tích hợp + hardening cuối). Đã replan ngày 2026-10-31
+  theo quyết định Q1 = B: annotation phải bền qua reload và khởi
+  động lại app — nền lưu trữ TASK-08A làm trước, xem dưới.
 - **Mục tiêu:** Mở/hiển thị PDF (PDF.js), phủ lớp vẽ của Drawing Engine,
-  lưu/tải lại chú thích theo trang.
-- **Phụ thuộc:** TASK-05, TASK-08 (storage) — có thể làm song song phần hiển thị.
+  lưu/tải lại chú thích theo trang qua Storage Foundation.
+- **Phụ thuộc:** TASK-05 (xong, commit `7aa608e`), TASK-08A (xong).
 - **Phạm vi:** Xem + chú thích. Chưa xuất file (TASK-09).
 - **File dự kiến:** `src/engines/pdf/**`, `src/engines/annotation/**`.
 - **Tiêu chí nghiệm thu:** Mở PDF mẫu nhiều trang; vẽ trên trang bất kỳ;
-  đóng/mở lại chú thích còn nguyên đúng vị trí, kể cả sau zoom/cuộn.
+  đóng/mở lại và reload trang web chú thích còn nguyên đúng vị trí,
+  kể cả sau zoom/cuộn.
+- **Subtask đã chốt:** 06A PDF.js & Loader → 06B Render & hình học
+  trang → 06C Annotation Engine (dùng repository thật của TASK-08A)
+  → 06D Overlay Integration → 06E Viewer tối thiểu → 06F Integration
+  & Testing. Chi tiết trong báo cáo replan ngày 2026-10-31.
+- **TASK-06A — PDF.js & Document Loader: DONE ngày 2026-10-31.**
+  Cài pdfjs-dist 6.4.299 (Apache-2.0); worker đóng gói local qua
+  Vite `?url` (kiểm chứng cả dev lẫn production build: worker tải
+  từ cùng origin, không CDN; bản chính không chạy được trong Node
+  nên vitest.config.ts alias sang bản legacy riêng cho test).
+  `src/engines/pdf/`: pdfjs.ts (cấu hình một lần), loader.ts
+  (openPdfDocument nhận Blob/ArrayBuffer/Uint8Array, sao chép dữ
+  liệu caller để không bị PDF.js detach; PdfDocumentHandle:
+  pageCount/metadata/getPage/getNativePage index zero-based,
+  close = destroy loading task, AbortSignal hủy loading),
+  errors.ts (PdfLoadError phân loại not-a-pdf/corrupt/password/
+  unsupported/cancelled/worker/closed/unknown + cause;
+  PdfPageIndexError). Fixtures sinh bằng code (gồm PDF mã hóa
+  Standard R2 tự dựng để test lỗi mật khẩu). 17 test mới, tổng
+  365/365; kiểm chứng trình duyệt thật 7/7 ở cả dev và production.
+  PDF có mật khẩu hiện chỉ PHÁT HIỆN (kind password), chưa mở khóa.
+  Chưa commit.
+- **TASK-06B — Page Rendering & Geometry: DONE ngày 2026-10-31.**
+  `geometry.ts`: getPdfPageGeometry(handle, index, scale) — mọi số
+  đo từ getViewport của PDF.js (pageWidth/Height tại scale 1,
+  viewport tại scale yêu cầu, rotation, kèm viewport native cho
+  06D); scale không hợp lệ → PdfRenderError invalid-argument.
+  `renderer.ts`: PdfPageRenderer (mỗi instance một registry
+  WeakMap theo canvas, không global state) — render(handle, index,
+  canvas, {scale, devicePixelRatio, background}); bitmap =
+  viewport × DPR (làm tròn, tối thiểu 1), style CSS = viewport
+  thuần, PDF.js nhận transform nhân DPR (bỏ khi DPR = 1); entry
+  đăng ký đồng bộ ngay khi gọi nên cancel ngay lập tức có tác
+  dụng; render mới trên cùng canvas hủy + CHỜ render cũ kết thúc
+  hẳn mới vẽ; cancel/cancelAll/dispose idempotent; lỗi loader
+  (closed/index) truyền nguyên vẹn, lỗi render PDF.js →
+  render-failed kèm cause, hủy/transport destroy → cancelled.
+  Hai lỗi thật do test bắt được và đã sửa: canvas null từng làm lộ
+  TypeError của WeakMap thay vì PdfRenderError (nay validate
+  trước khi đăng ký); lỗi thô PDF.js ở bước lấy trang khi đóng
+  tài liệu giữa chừng từng thoát ra không định dạng (nay phân
+  loại cancelled/render-failed, kiểm chứng lại ở trình duyệt
+  thật: rejected:cancelled). 23 test mới (7 geometry trên PDF.js
+  thật gồm trang xoay 90°, 16 renderer bằng page/canvas giả có
+  kiểm soát), tổng 388/388; Browser QA 16/16 ở DPR 1 và DPR 2
+  (điểm ảnh có mực thật, hủy, đóng giữa render nặng 3.000 dòng
+  chữ, 0 lỗi console). Chưa commit. Kế tiếp: TASK-06C.
+- **TASK-06C — Annotation Engine: DONE ngày 2026-10-31.**
+  `src/engines/annotation/`: AnnotationEngine quản lý session theo
+  surfaceId (mỗi surface tối đa 1 session, mở trùng →
+  already-open); openDocumentPage nạp + validate dữ liệu đã lưu
+  bằng chính validateDrawingObject của Drawing Engine + khớp
+  surfaceId (một object lỗi → AnnotationDataError mang
+  objectIndex/objectId/problems, lần mở thất bại sạch, bản lưu
+  không bị đụng; record schema tương lai → lỗi của data layer
+  truyền nguyên vẹn). Kết nối Drawing Engine qua NotifyingSurface
+  (bọc DrawingSurface, phát thông báo sau mỗi mutation thành
+  công — gồm cả undo/redo qua insertObjectAt) nên không polling,
+  không sửa Drawing Engine. Lưu qua AutosaveManager dùng chung
+  (saveNow = schedule snapshot + flush; không có autosave thì
+  lưu trực tiếp có thứ tự). Chính sách đóng: mặc định flush
+  trước, flush lỗi thì đóng thất bại và session vẫn mở;
+  close({flush:false}) bỏ thay đổi tường minh; đóng không xóa
+  dữ liệu; deleteSavedData tường minh theo thứ tự flush →
+  cancel → delete. 21 test mới (khôi phục đủ 7 loại object deep
+  equal, validation 4 ca, persistence/lifecycle 10 ca với
+  repository lỗi có kiểm soát), tổng 409/409; Browser QA
+  IndexedDB thật qua reload trang 5/5. Chưa commit. Kế tiếp:
+  TASK-06D.
+- **TASK-06D — PDF Annotation Overlay Integration: DONE ngày
+  2026-10-31.** `src/engines/pdf/annotationMapping.ts` +
+  `overlay.ts`. Quy ước tọa độ chốt bằng audit source: world của
+  trang = khung trang ĐÃ HIỂN THỊ tại scale 1 (= viewport scale
+  1 của PDF.js, gốc trên-trái, y xuống) → world ↔ viewport là
+  phép nhân scale thuần ở mọi rotation; PDF user space ↔ world
+  đi qua convertToViewportPoint/convertToPdfPoint của chính
+  PageViewport (PDF.js lo flip + rotation); canvas physical =
+  viewport × DPR, DPR không vào dữ liệu. Overlay: PDF vẽ bằng
+  PdfPageRenderer lên canvas PDF, annotation vẽ bằng
+  CanvasRenderer của Drawing Engine lên canvas overlay trong
+  suốt (camera {0,0,zoom: scale}), đồng bộ qua subscription
+  trên NotifyingSurface (không polling), session đóng → overlay
+  tự dispose; setScale/setDevicePixelRatio/refreshAnnotations/
+  cancel/dispose đầy đủ. 19 test mới (9 mapping trên viewport
+  thật đủ 4 rotation với điểm cụ thể + round-trip; 10 overlay
+  với session thật), tổng 428/428. Browser QA 50/50 ở DPR 1/2:
+  annotation rectangle đặt theo tọa độ world tính từ marker đỏ
+  trong nội dung PDF — bbox mực trùng bbox marker trong ±2 CSS
+  px ở cả 4 rotation, scale 1 và 2. Một kỳ vọng test rotation
+  180 ban đầu do assistant suy luận sai đã được sửa theo hành
+  vi thật của PDF.js (transform [-1,0,0,1,612,0]). Chưa commit.
+  Kế tiếp: TASK-06E.
+- **TASK-06E — Minimal React PDF Viewer Integration: DONE ngày
+  2026-10-31.** `src/app/features/documents/`:
+  PdfViewerController (điều phối không phụ thuộc React),
+  PdfViewer.tsx, pdfViewerState.ts; `src/app/storage.ts` nối
+  tầng UI với foundation + AnnotationEngine dùng chung.
+  DocumentsPage thành thư viện thật (import PDF có kiểm chữ
+  ký, danh sách, xóa, mở viewer). Viewer: mở từ Blob đã lưu,
+  một trang tại một thời điểm, điều hướng + nhập số trang
+  (clamp), zoom [25%..400%] + Fit mặc định, công cụ Pen/
+  Highlighter/Tẩy nét + Undo/Redo qua DrawingEngine, trạng
+  thái lưu Đang lưu/Đã lưu/Lỗi + thử lưu lại. An toàn dữ liệu:
+  mọi thao tác nối tiếp qua hàng đợi; chuyển trang flush
+  session cũ trước — lỗi thì hủy chuyển trang và giữ dữ liệu.
+  Overlay có thêm tùy chọn annotationRendering 'external'
+  (mặc định 'managed' không đổi) để DrawingEngine là chủ
+  render duy nhất của canvas annotation khi tương tác. 17
+  test mới, tổng 445/445; Browser QA trên UI thật: dev 26/26,
+  production 14/14 (vẽ → lưu → reload khôi phục, tài liệu
+  xoay + cách ly annotation, DPR 2, responsive 390/768).
+  Chưa commit. Kế tiếp: TASK-06F.
+- **TASK-06F — PDF Viewer Integration & Testing: DONE ngày
+  2026-10-31.** Vòng kiểm thử tích hợp toàn bộ workflow PDF:
+  11 test tích hợp mới (tests/viewer/integration.test.ts) +
+  Browser QA 06F trên UI thật (dev đủ bộ, production đủ bộ).
+  **Một lỗi thật đã sửa:** AnnotationSurfaceSession.close()
+  trước đây luôn ghi snapshot hiện tại kể cả khi phiên không
+  có thay đổi nào — mở xem một trang rồi đóng cũng tạo record
+  rỗng và (nguy hiểm hơn) có thể ghi đè annotation mới hơn
+  từ phiên/tab khác bằng trạng thái tại thời điểm mở. Đã sửa
+  tại annotationEngine.ts: session theo dõi hasChanges,
+  saveNow xác nhận mới xóa cờ, close chỉ flush khi có thay
+  đổi thật; có 2 test hồi quy (đóng phiên chỉ-đọc không tạo
+  record; mở lại trang đã có annotation rồi đóng ngay thì
+  updatedAt giữ nguyên). Tổng 456/456 test. Đo hiệu năng
+  (Chromium headless trên VM): mở tài liệu 50 trang ≈ 700 ms,
+  200 trang ≈ 680 ms, chuyển trang ≈ 260 ms, bitmap/trang ở
+  fit ≈ 1,0 MB/lớp, heap phẳng sau 5 chu kỳ mở/đóng, 0 canvas
+  sót trong DOM. Đa tab: ghi đồng thời vẫn last-writer-wins
+  theo từng surface — ghi nhận ISSUE-015 kèm phương án đề
+  xuất, không triển khai đồng bộ đa tab theo brief. TASK-06
+  hoàn tất. Chưa commit. Kế tiếp: TASK-08B (Library UI).
+- **TASK-06F-A — Kiểm chứng race của dirty tracking: DONE
+  ngày 2026-10-31.** Theo đúng trình tự nghi vấn của brief,
+  test bằng repository ghi bị giữ (deferred) đã TÁI HIỆN
+  được race ở chế độ lưu trực tiếp: mutation tới trong lúc
+  saveNow đang ghi bị đánh dấu nhầm là đã lưu, close()
+  hoàn thành trước khi dữ liệu mới nhất xuống storage. Đã
+  sửa bằng generation counter tại Annotation Engine (gồm
+  flushDirect chờ chuỗi ổn định và close lặp kiểm tra),
+  6 test hồi quy mới, tổng 462/462. Chi tiết: CHANGELOG.
 
 ## TASK-07 — Word Engine: xem, sửa nội dung & chú thích DOCX
-- **Trạng thái:** NOT_STARTED
+- **Trạng thái:** DONE ngày 2026-10-31 — toàn bộ 07A–07F hoàn
+  thành (kế hoạch TASK-07-SCOPE). Nhập (Mammoth + sanitize +
+  Content Model v2), editor Tiptap + autosave, fidelity hai
+  kênh, annotation một surface (DEC-029, giới hạn không bám
+  chữ ghi tại ISSUE-016), xuất DOCX (DEC-030), tích hợp thư
+  viện/kéo-thả và kiểm thử vòng đời + backup/restore tại
+  TASK-07F (docs v1.29).
 - **Mục tiêu:** Mở DOCX, chỉnh sửa nội dung (Tiptap hoặc tương đương theo
   TASK-02), chú thích phủ lên nội dung; xác định chiến lược xử lý ảnh
   WMF/EMF và công thức OMML.
 - **Phụ thuộc:** TASK-05, TASK-08; kết quả xử lý ISSUE-002/003/004.
-- **Phạm vi:** Xem + sửa + chú thích. Xuất DOCX thuộc TASK-09.
+- **Phạm vi:** Xem + sửa + chú thích. Xuất DOCX: theo kế hoạch
+  TASK-07-SCOPE sẽ kéo về TASK-07E (chốt lại khi giao 07E);
+  TASK-09 khi đó còn xuất PDF flatten.
 - **File dự kiến:** `src/engines/word/**`.
 - **Tiêu chí nghiệm thu:** Mở DOCX mẫu (có bảng, ảnh thường, công thức nếu
   có); sửa chữ và lưu lại được; chú thích đúng vị trí sau khi sửa nội dung
   phía trên (hoặc ghi rõ giới hạn đã biết vào KNOWN_ISSUES.md).
 
+### TASK-07A — DOCX Import & Editable Content Model
+- **Trạng thái:** DONE (2026-10-31). Chi tiết tại CURRENT_STATE.md
+  mục TASK-07A (docs v1.23). Tóm tắt: Mammoth + DOMPurify (sanitize
+  tại biên) → mô hình nội dung JSON tương thích Tiptap; Dexie
+  schema v2 cộng thêm bảng `documentContents` (contentVersion 1)
+  + cascade xóa; thư viện nhập được DOCX (chưa có editor).
+  21 test mới trong `tests/word/`. Chưa commit.
+
+### TASK-07B — Tiptap Editor & Content Save/Restore
+- **Trạng thái:** DONE (2026-10-31). Chi tiết tại CURRENT_STATE.md
+  mục TASK-07B (docs v1.24). Tóm tắt: Tiptap 3.32.2 (MIT;
+  StarterKit đã gồm Link + Underline, Table/Image cài riêng);
+  WordEditorController với generation counter chống race (khuôn
+  06F-A); autosave debounce 800 ms, lưu JSON (không HTML);
+  quay lại thư viện phải flush xong, lỗi thì ở lại + cho bỏ
+  thay đổi tường minh. 11 test mới. Chưa commit.
+
+### TASK-07C — Định dạng & Fidelity
+- **Trạng thái:** DONE ngày 2026-10-31. Audit fidelity bằng
+  fixture giàu định dạng + đọc source Mammoth trước khi sửa;
+  hỗ trợ: sup/sub, cỡ chữ/highlight/font trực tiếp (kênh
+  transformDocument + style map động), căn lề đoạn + kích
+  thước ảnh + nền ô (luồng document.xml có guard số lượng),
+  colspan/rowspan; Content Model v2 (DEC-028). Chi tiết tại
+  CURRENT_STATE.md mục TASK-07C (docs v1.26). Hoãn có lý do:
+  màu chữ (Mammoth không đọc w:color), thụt lề/khoảng cách
+  đoạn, border tùy biến.
+
+### TASK-07D — Annotation Integration cho DOCX
+- **Trạng thái:** DONE ngày 2026-10-31. Một surface duy
+  nhất (pageIndex 0), Drawing Engine + Annotation Engine
+  dùng chung, hai chế độ Sửa/Chú thích, giới hạn không
+  bám theo chữ ghi thành DEC-029 và hiển thị ngay trong
+  UI. Chi tiết tại CURRENT_STATE.md mục TASK-07D (docs
+  v1.27).
+
+### TASK-07E — DOCX Export
+- **Trạng thái:** DONE ngày 2026-10-31. Mapper Content
+  Model → thư viện `docx` 9.15.0 (MIT), dialog xuất với
+  cảnh báo DEC-018, bản in/PDF kèm chú thích qua hộp
+  thoại in của trình duyệt — quyết định ghi thành
+  DEC-030. Chi tiết tại CURRENT_STATE.md mục TASK-07E
+  (docs v1.28).
+
+### TASK-07F — Tích hợp Document Manager & Kiểm thử tổng thể
+- **Trạng thái:** DONE ngày 2026-10-31. Kéo-thả nhập nhiều
+  file vào thư viện (dùng chung đường nhập với nút chọn
+  file, chặn trình duyệt mở file khi thả trượt); bộ test
+  vòng đời trọn vẹn + ranh giới (rỗng/lớn/Unicode/đua
+  autosave); ISSUE-016 ghi giới hạn annotation DOCX;
+  ISSUE-010 đóng vòng bằng chứng round-trip. Chi tiết
+  tại CURRENT_STATE.md mục TASK-07F (docs v1.29).
+
 ## TASK-08 — Local Storage & Document Manager
-- **Trạng thái:** NOT_STARTED
+- **Trạng thái:** DONE — cả ba phần 08A/08B/08C đều
+  hoàn thành ngày 2026-10-31 (replan đưa nền lưu trữ
+  lên trước TASK-06 vì Q1 = B).
 - **Mục tiêu:** IndexedDB: lưu file gốc, chú thích, metadata; thư viện tài
   liệu (danh sách, mở lại, đổi tên, xóa); tự lưu; cảnh báo khi gần hết quota.
   Bao gồm thực thể bảng trắng và trạng thái workspace của Split Mode (cả
@@ -231,9 +441,58 @@
 - **File dự kiến:** `src/data/**`, `src/app/library/**`.
 - **Tiêu chí nghiệm thu:** Tắt/mở lại app (kể cả offline) dữ liệu còn nguyên;
   đo được dung lượng đã dùng; xóa tài liệu xóa sạch cả chú thích.
+- **TASK-08A — Storage Foundation: DONE ngày 2026-10-31.** Dexie
+  database `webscribble` schema v1 (bảng documents/annotations);
+  DocumentRepository (nhập Blob nguyên vẹn, documentId mới mỗi lần
+  nhập — QA-B không gộp trùng, xóa tài liệu xóa sạch annotation
+  trong cùng transaction); AnnotationRepository (record theo
+  surfaceId `document:<documentId>:<pageIndex>`, put nguyên tử,
+  bảo vệ schemaVersion mới hơn); StorageManager (persist/estimate
+  qua adapter, an toàn khi thiếu API); AutosaveManager (debounce
+  400 ms theo surface, flush/cancel, chống write cũ ghi đè). 27 unit
+  test fake-indexeddb + kiểm chứng IndexedDB thật trên Chromium
+  headless (lưu → reload → đọc lại nguyên vẹn). Chưa commit.
+- **TASK-08B — Document Manager & Library UI: DONE ngày
+  2026-10-31.** Trên nền DocumentsPage của TASK-06E: danh sách
+  hiển thị tên/loại/dung lượng/ngày/số trang, thứ tự "gần đây
+  nhất" theo updatedAt (sắp xếp ở tầng UI, không đổi Data
+  Layer); đổi tên qua updateMetadata (chặn tên rỗng, bền qua
+  reload, không đụng Blob/annotation — surfaceId khóa theo
+  documentId); xóa có xác nhận inline, giữ cascade; panel
+  dung lượng dùng StorageManager: usage/quota ước tính + tỷ
+  lệ, cảnh báo từ ngưỡng 80% (hằng số QUOTA_WARNING_THRESHOLD
+  tập trung trong src/app/libraryModel.ts), trạng thái lưu
+  trữ bền + nút xin cấp, trạng thái "không khả dụng" trung
+  thực khi API thiếu/lỗi; RecentDocuments ở Trang chủ nối dữ
+  liệu thật (tối đa 5, nhấn để mở đúng tài liệu trong
+  viewer), bỏ nội dung tĩnh cũ. 13 test mới (tổng 475/475);
+  Browser QA dev + production đạt toàn bộ (gồm giả lập
+  estimate 85% → cảnh báo, API bị vô hiệu → trạng thái không
+  khả dụng, xin persistent thành công; 1440/768/390 không
+  tràn ngang). ISSUE-005 còn OPEN ở phần đo thiết bị thật.
+  Chưa commit. Kế tiếp: TASK-08C hoặc TASK-07 — chờ giao.
+- **TASK-08C — Whiteboard/Workspace/Backup: HOÀN TẤT PHẦN
+  BACKUP/RESTORE ngày 2026-10-31** (theo brief TASK-08C của
+  chủ dự án — phạm vi lần này chỉ gồm sao lưu/khôi phục):
+  định dạng ZIP + manifest + SHA-256 (DEC-027), restore
+  merge-remap trong một transaction, panel trong thư viện.
+  Chi tiết tại CURRENT_STATE.md mục TASK-08C (docs v1.25).
+  Phần thực thể bảng trắng thuộc TASK-12, trạng thái
+  workspace Split thuộc TASK-13 — chưa bắt đầu.
 
 ## TASK-09 — Export Engine
-- **Trạng thái:** NOT_STARTED
+- **Trạng thái:** DONE ngày 2026-10-31 (docs v1.32,
+  DEC-033). Export Engine ở `src/engines/pdf/
+  exportPdf.ts` (pdf-lib): flatten annotation lên
+  bản sao PDF gốc — vector (outline perfect-freehand
+  → drawSvgPath, hình khối → primitive, chữ →
+  Helvetica) hoặc raster 3× bằng chính drawObject;
+  ánh xạ world → PDF user space qua
+  convertToPdfPoint của viewport (khớp 1:1, kiểm
+  chứng bằng số đo content stream + render lại).
+  Phạm vi tất cả trang / chỉ trang có chú thích;
+  PdfExportDialog dùng chung cho Document Mode và
+  Split Mode. Phía DOCX đã xong ở TASK-07E (DEC-030).
 - **Mục tiêu:** Xuất PDF kèm chú thích (pdf-lib); xuất DOCX sau chỉnh sửa;
   kiểm chứng file xuất mở đúng bằng ứng dụng văn phòng phổ biến.
 - **Phụ thuộc:** TASK-06, TASK-07.
@@ -243,7 +502,14 @@
   trình đọc PDF và một ứng dụng Word phổ biến; chú thích hiển thị đúng vị trí.
 
 ## TASK-10 — PWA & Offline
-- **Trạng thái:** NOT_STARTED
+- **Trạng thái:** DONE ngày 2026-10-31 (docs v1.33,
+  DEC-034). Manifest + bộ icons PNG tự sinh; Service
+  Worker tự sinh ở bước build (generate-sw.mjs)
+  pre-cache toàn bộ dist gồm PDF.js worker, phiên
+  bản theo hash nội dung; cache-first + ignoreVary;
+  cập nhật theo chủ động của người dùng (banner +
+  SKIP_WAITING); PwaStatus: nút cài đặt
+  (beforeinstallprompt), huy hiệu ngoại tuyến.
 - **Mục tiêu:** Web App Manifest + Service Worker: cài đặt được, cache app
   shell và thư viện, dùng đầy đủ chức năng cốt lõi khi offline.
 - **Phụ thuộc:** TASK-03; hoàn thiện sau TASK-06/07/08.
@@ -253,7 +519,14 @@
   mở tài liệu đã lưu, vẽ và xuất file; có quy trình cập nhật phiên bản an toàn.
 
 ## TASK-11 — Testing & nghiệm thu tổng thể
-- **Trạng thái:** NOT_STARTED
+- **Trạng thái:** TESTING — phần tự động và Chromium
+  đã đạt ở mức phát hành MVP v1.0.0 (587 test Vitest,
+  Browser QA từng task trên bản production, chu trình
+  offline + cập nhật PWA). Phần còn lại duy nhất:
+  nghiệm thu trên thiết bị/trình duyệt đại diện thật
+  (bút stylus, iPad/Safari — ISSUE-006) khi có phần
+  cứng; thực hiện như một vòng nghiệm thu sau phát
+  hành, không chặn bản MVP.
 - **Mục tiêu:** Kiểm thử theo tiêu chí nghiệm thu cấp sản phẩm
   (PRODUCT_SPEC.md mục 6) trên thiết bị/trình duyệt đại diện; xử lý lỗi tồn đọng.
 - **Phụ thuộc:** TASK-04 → TASK-10, TASK-12, TASK-13.
@@ -264,7 +537,18 @@
   ghi rõ mục chưa đạt kèm lý do vào KNOWN_ISSUES.md.
 
 ## TASK-12 — Whiteboard Engine & Whiteboard Mode
-- **Trạng thái:** NOT_STARTED
+- **Trạng thái:** DONE ngày 2026-10-31 (docs v1.30).
+  Bảng trắng là một tài liệu thư viện (DEC-031): manifest
+  JSON trong Blob (trang cố định 1600×1000, nền theo
+  trang), nét vẽ qua Annotation Engine dùng chung trên
+  surface `document:<id>:<trang>`, remap hai pha khi
+  xóa/đổi thứ tự trang. WhiteboardPage của shell thành
+  danh sách thật + WhiteboardView nhiều trang; thư viện
+  chính cũng tạo/mở được bảng trắng. Phạm vi công cụ
+  theo brief TASK-12: bút/highlight/tẩy nét/màu/cỡ nét/
+  undo-redo theo trang (công cụ hình khối/chữ của
+  Drawing Engine chưa gắn vào viewer nào — cùng tình
+  trạng ở Document Mode).
 - **Mục tiêu:** Không gian bảng trắng độc lập (Whiteboard Engine): viết tay,
   vẽ tự do, tạo văn bản, vẽ hình dạng, tẩy, chọn/di chuyển/chỉnh sửa đối
   tượng, Undo/Redo; bảng trắng lưu và khôi phục như một thực thể trong thư
@@ -280,7 +564,17 @@
   bảng trắng ngoài Drawing Engine chung.
 
 ## TASK-13 — Split Mode
-- **Trạng thái:** NOT_STARTED
+- **Trạng thái:** DONE ngày 2026-10-31 (docs v1.31,
+  DEC-032). Workspace hai pane: trái PDF (SplitPdfPane
+  dùng thẳng PdfViewerController) hoặc DOCX (WordEditor
+  nhúng), phải bảng trắng (WhiteboardView nhúng); phối
+  hợp qua SplitController + DrawingPaneAdapter — thanh
+  công cụ chung route theo pane active, undo/redo cô
+  lập tuyệt đối; resizer kéo + mốc 30/70, 50/50, 70/30
+  + thu gọn pane; vết liên kết phiên ở localStorage;
+  dưới 768px dạng tab. Vào Split từ thanh điều hướng,
+  nút Split trên thẻ thư viện/bảng trắng, hoặc bộ chọn
+  trong workspace.
 - **Mục tiêu:** Workspace hai khu vực trong một màn hình: tài liệu (PDF/
   DOCX/ảnh) + bảng trắng; chỉnh được tỷ lệ diện tích; lưu và khôi phục
   trạng thái cả hai khu vực (ISSUE-013).

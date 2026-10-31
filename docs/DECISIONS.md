@@ -314,6 +314,299 @@
   ở các task sau.
 - **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
 
+### DEC-027 — Định dạng sao lưu thư viện và chính sách khôi phục merge-remap (TASK-08C)
+- **Nội dung:**
+  1. Định dạng backup là **một file ZIP** tạo/đọc bằng JSZip
+     (đóng gói local): `manifest.json` + `data/annotations.json` +
+     `data/contents.json` + `files/<documentId>` chứa bytes Blob
+     gốc nguyên vẹn. Không base64 hóa Blob vào JSON.
+  2. Manifest mang `backupFormatVersion` **độc lập** với phiên
+     bản schema Dexie và với schemaVersion của từng loại record;
+     kèm thời điểm tạo, thống kê số lượng, và **SHA-256 của từng
+     file thành phần** (Web Crypto). Restore kiểm chứng toàn bộ
+     (định dạng, version, cấu trúc, quan hệ không-mồ-côi,
+     checksum) **trước khi ghi bất cứ thứ gì**.
+  3. Chính sách khôi phục duy nhất là **merge an toàn**: không
+     ghi đè, không xóa dữ liệu hiện có, không có chế độ thay thế
+     toàn bộ. Document trùng ID được nhập thành **bản sao với ID
+     mới**; annotation (documentId + surfaceId) và
+     documentContents (documentId) được remap nhất quán; toàn bộ
+     lần ghi nằm trong **một transaction Dexie** trên cả ba bảng
+     — lỗi giữa chừng → hủy toàn bộ, thư viện giữ nguyên.
+  4. Nội dung DOCX trong backup giữ nguyên dạng JSON Content
+     Model (không chuyển HTML); Blob gốc giữ nguyên từng byte.
+- **Lý do:** DEC-022 bắt buộc sao lưu/khôi phục cho iOS; ZIP +
+  checksum cho phép kiểm chứng độc lập và mang theo Blob nhị
+  phân không phình dữ liệu; merge-remap là chính sách duy nhất
+  không thể làm mất dữ liệu hiện có — phù hợp nguyên tắc
+  local-first và không có tài khoản/máy chủ để hòa giải xung đột.
+- **Phạm vi:** `src/data/backup/` và panel Sao lưu & Khôi phục
+  trong thư viện (TASK-08C). Whiteboard/Workspace entities sẽ
+  phải tham gia định dạng này khi TASK-12/13 triển khai (tăng
+  `backupFormatVersion` nếu cần).
+- **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
+
+### DEC-028 — Kênh fidelity DOCX và Content Model version 2 (TASK-07C)
+- **Nội dung:**
+  1. Content Model nâng lên **version 2** (DOCUMENT_CONTENT_
+     VERSION = 2), mở rộng TƯƠNG THÍCH NGƯỢC: marks
+     `superscript`, `subscript`, `textStyle` (attrs color/
+     backgroundColor/fontSize/fontFamily bị chặn mẫu an
+     toàn); `textAlign` trên paragraph/heading; `background`,
+     `colspan`, `rowspan` trên ô bảng; `width`/`height` trên
+     ảnh. Giá trị null do Tiptap phát ra cho attr chưa đặt
+     được coi là vắng mặt. Nội dung version 1 là tập con hợp
+     lệ; KHÔNG đổi schema Dexie, không cần migration dữ
+     liệu — bản ghi cũ mở bình thường và được ghi lại thành
+     version 2 khi lưu lần tiếp theo.
+  2. Hai kênh fidelity khi nhập DOCX:
+     a. **Định dạng ký tự trực tiếp** (cỡ chữ, highlight,
+        font): Mammoth đọc được từ rPr nhưng không xuất
+        HTML → dùng `transformDocument` hai lượt: lượt 1
+        thu thập token, lượt 2 đổi styleName của run thành
+        tên tự sinh + STYLE MAP ĐỘNG để run được bọc trong
+        span mang class `ws-*`; converter giải mã class
+        thành mark textStyle. Định dạng đi cùng run — không
+        đối chiếu vị trí.
+     b. **Luồng document.xml có guard** (căn lề đoạn, kích
+        thước ảnh từ wp:extent, nền ô từ w:shd): đối chiếu
+        thứ tự tài liệu giữa XML và HTML; chỉ áp dụng khi
+        SỐ LƯỢNG hai phía khớp đúng, lệch → bỏ qua cả luồng
+        (thà thiếu định dạng còn hơn gán nhầm).
+  3. Chấp nhận mất mát có ghi nhận: **màu chữ** (Mammoth
+     không hề đọc `w:color` — bằng chứng trong source của
+     thư viện), thụt lề và khoảng cách đoạn, border bảng
+     tùy biến — hoãn sang vòng fidelity sau nếu có.
+- **Lý do:** Audit TASK-07C đo trên fixture thật cho thấy
+  các mất mát lớn nhất đều có kênh truyền an toàn; hai
+  kênh trên giữ nguyên nguyên tắc "không bao giờ gán sai"
+  và không đụng file gốc hay pipeline PDF/annotation.
+- **Phạm vi:** `src/engines/word/` (importer, enrichment,
+  htmlToContent, contentModel), extensions/toolbar của
+  Word Editor. TASK-07E (xuất DOCX) sẽ map các attrs/marks
+  version 2 này ra file xuất.
+- **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
+
+### DEC-029 — Mô hình annotation cho DOCX: một surface, tọa độ nội dung tuyệt đối (TASK-07D)
+- **Nội dung:**
+  1. DOCX dùng **một surface annotation duy nhất** cho cả
+     tài liệu theo quy ước sẵn có `document:<documentId>:0`
+     (pageIndex 0), qua chính Annotation Engine và Drawing
+     Engine dùng chung (DEC-015) — không có engine/store
+     riêng cho DOCX. Lưu trữ, autosave, undo/redo, backup
+     dùng lại toàn bộ hạ tầng của PDF.
+  2. Hệ tọa độ world của surface là **không gian nội dung
+     editor (CSS px, zoom 1)**, gốc tại góc trên-trái của
+     thẻ trang; canvas phủ kín thẻ trang và cuộn cùng nội
+     dung. Chế độ Sửa văn bản: canvas `pointer-events:
+     none` + editor editable; chế độ Chú thích: canvas
+     nhận toàn bộ pointer + editor khóa sửa. pageSize
+     khai cho surface là khung danh nghĩa lớn theo chiều
+     dọc (metadata, không cắt nét).
+  3. **Giới hạn chấp nhận và công bố cho người dùng:**
+     annotation neo theo tọa độ tuyệt đối — KHÔNG bám
+     theo chữ khi sửa nội dung hoặc khi cửa sổ đổi chiều
+     ngang làm chữ xuống dòng lại. Nét vẽ vẫn được bảo
+     toàn dữ liệu và vị trí tuyệt đối; độ lệch tương đối
+     so với chữ là đánh đổi của version 1 (neo theo vị
+     trí ký tự đòi hỏi mô hình neo văn bản riêng).
+  4. Vòng đời phiên: controller chú thích sống trong
+     registry theo documentId qua các lần mount; rời
+     editor bằng nút Thư viện phải flush xong cả nội
+     dung lẫn chú thích mới được rời.
+- **Lý do:** Nhất quán với kiến trúc một-Drawing-Engine
+  (DEC-015) và kế hoạch TASK-07-SCOPE đã duyệt; mô hình
+  một surface khớp thực tế DOCX không có trang cố định
+  trong editor web.
+- **Phạm vi:** `DocxAnnotationController` + tích hợp
+  trong WordEditor (TASK-07D). Xuất DOCX kèm chú thích
+  KHÔNG thuộc phạm vi (TASK-07E chỉ xuất nội dung).
+- **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
+
+### DEC-030 — Xuất DOCX và bản in kèm chú thích (TASK-07E)
+- **Nội dung:**
+  1. Xuất nội dung đã sửa bằng thư viện `docx` (MIT,
+     đóng gói local): Content Model → document.xml qua
+     ánh xạ trực tiếp (không qua HTML). Tên file mặc
+     định `<tên gốc>_edited.docx` (làm sạch ký tự cấm,
+     người dùng sửa được trong dialog). File gốc trong
+     thư viện KHÔNG BAO GIỜ bị ghi đè bởi luồng xuất —
+     kết quả chỉ là Blob tải xuống (DEC-005/DEC-018,
+     kèm cảnh báo mất định dạng trong dialog).
+  2. File DOCX xuất ra chỉ chứa NỘI DUNG VĂN BẢN.
+     Chú thích viết tay (DEC-029) không nhúng vào
+     DOCX — đúng mô hình lớp phủ độc lập.
+  3. Bản phẳng kèm chú thích ở version 1 = **In / Lưu
+     PDF qua hộp thoại in của trình duyệt**: lớp in
+     chỉ gồm thẻ trang + ảnh chụp canvas chú thích ở
+     độ phân giải bitmap thật (CSS × DPR) thay cho
+     canvas sống. Sinh file PDF bằng code (pdf-lib)
+     vẫn thuộc Export Engine của TASK-09, không gộp
+     vào task này.
+  4. Ánh xạ highlight khi xuất: hex khớp bảng màu
+     Word → `w:highlight` (đọc lại được khi nhập);
+     hex khác → shading của run (Word hiển thị đúng,
+     importer không đọc lại shading của run — đánh
+     đổi đã ghi nhận). Mỗi danh sách số dùng một
+     numbering reference riêng để bắt đầu lại từ 1.
+  5. Sửa ở importer (phát hiện nhờ round-trip của
+     task này): phần tử `<w:tblHeader w:val="off"/>`
+     (hàng bị tắt cờ tiêu đề tường minh, do chính
+     thư viện `docx` và một số trình sinh file ghi)
+     được gỡ trước khi qua Mammoth — Mammoth chỉ nhìn
+     sự hiện diện của phần tử nên trước đây mọi hàng
+     đều thành hàng tiêu đề khi nhập lại.
+- **Lý do:** DEC-016 đã chốt thư viện `docx` cho chiều
+  xuất; in qua trình duyệt cho bản PDF phẳng ngay mà
+  không thêm dependency raster hóa DOM nặng và kém
+  tin cậy, trong khi sinh PDF bằng code đã có nhà là
+  TASK-09.
+- **Phạm vi:** `exportDocx.ts` (Word Engine),
+  dialog Xuất bản + `printExport.ts` + CSS in trong
+  WordEditor (TASK-07E).
+- **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
+
+### DEC-031 — Bảng trắng là một tài liệu thư viện, manifest trong Blob (TASK-12)
+
+- **Bối cảnh:** TASK-12 cần thực thể bảng trắng nhiều trang
+  (DEC-019: trang cố định) dùng chung Drawing Engine
+  (DEC-015), autosave và tương thích 100% với backup ZIP
+  của TASK-08C (DEC-027). Thêm bảng Dexie mới sẽ phá vỡ
+  cả ba ràng buộc đó (backup không biết tới bảng mới,
+  cascade xóa phải sửa, định dạng backup phải đổi).
+- **Quyết định:** (1) Bảng trắng là MỘT tài liệu trong
+  bảng `documents` hiện có với mime riêng
+  `application/vnd.webscribble.whiteboard`; số trang
+  đồng bộ vào `pageCount` để thẻ thư viện hiển thị sẵn.
+  (2) Cấu trúc bảng (phiên bản định dạng, kích thước
+  trang cố định 1600×1000, nền từng trang) lưu thành
+  manifest JSON trong chính Blob của tài liệu — thay
+  Blob qua `DocumentRepository.replaceBlob` (chỉ dùng
+  cho bảng trắng; Blob PDF/DOCX là file gốc, không bao
+  giờ thay). (3) Nét vẽ trang i dùng đúng quy ước
+  surface sẵn có `document:<id>:<i>` và Annotation
+  Engine — không surface namespace mới. Nhờ vậy backup/
+  restore/remap/xóa cascade của TASK-08C áp dụng nguyên
+  vẹn, không đổi `backupFormatVersion`. (4) Thao tác
+  đổi cấu trúc trang (xóa/đổi thứ tự) remap annotation
+  bằng thuật toán hai pha qua surface staging
+  `whiteboard-stage:<id>:<token>:<newIndex>` (bản sao
+  staging xong mới ghi đè đích; dọn staging ở pha cuối
+  và quét lại mỗi lần mở bảng), đồng thời BẮT BUỘC viết
+  lại trường `surfaceId` bên trong từng DrawingObject
+  cho khớp surface đích — Annotation Engine kiểm chứng
+  trường này khi mở surface (lỗi invalid-data đã tái
+  hiện và có test regression nếu bỏ sót). (5) Nền trang
+  (trơn trắng/tối/kẻ ngang/lưới caro/chấm) là dữ liệu
+  manifest + hiển thị bằng CSS — tách biệt hoàn toàn
+  khỏi dữ liệu nét vẽ nên đổi nền không bao giờ làm
+  lệch hay mất nét. (6) Undo/redo theo từng trang trong
+  phiên mở (ngăn xếp của Drawing Engine); nét khôi phục
+  từ lưu trữ không nằm trong ngăn xếp undo của phiên
+  mới — nhất quán với Document Mode.
+- **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
+
+### DEC-032 — Split Mode: phối hợp bằng adapter + vết liên kết ở localStorage (TASK-13)
+
+- **Bối cảnh:** TASK-13 cần hai bề mặt độc lập tuyệt đối
+  (DEC-020: dữ liệu/autosave/undo riêng) trên một khung
+  có thanh công cụ chung, đồng thời khôi phục được cặp
+  tài liệu + bảng trắng gần nhất (ISSUE-013 đã chốt mô
+  hình tham chiếu ở TASK-02).
+- **Quyết định:** (1) Mỗi pane giữ nguyên controller
+  của mode gốc (PdfViewerController / WordEditor +
+  DocxAnnotationController / WhiteboardController) —
+  Split không sửa engine hay controller nào. (2) Lớp
+  phối hợp là `SplitController` framework-free với
+  `DrawingPaneAdapter`: bọc thống nhất ba controller
+  về một giao diện công cụ (tool/màu/cỡ nét/undo/redo +
+  subscribe); thanh công cụ chung chỉ route tới
+  adapter của pane ACTIVE, pane còn lại không nhận
+  lệnh nào. Pane PDF khai capabilities màu/cỡ nét =
+  false (viewer PDF dùng style mặc định của engine từ
+  TASK-06E) nên router chặn hai nhóm lệnh đó ở pane
+  này. Với pane DOCX, chọn công cụ vẽ qua thanh chung
+  tự chuyển editor sang chế độ Chú thích. (3) Vết
+  liên kết phiên (documentId, whiteboardId, tỉ lệ,
+  pane active) là trạng thái giao diện của thiết bị —
+  lưu ở localStorage (`webscribble:split-session:v1`),
+  KHÔNG đưa vào backup thư viện: dữ liệu thật của hai
+  bề mặt vẫn ở Dexie và được backup như thường; máy
+  khác khôi phục backup sẽ không có vết Split, đúng
+  bản chất phiên cục bộ. (4) Bố cục: resizer kéo tay
+  (tỉ lệ clamp 0.15–0.85) + mốc nhanh 30/70, 50/50,
+  70/30 + thu gọn từng pane; dưới 768px chuyển dạng
+  tab một chạm, cả hai pane giữ mounted (ẩn bằng CSS)
+  để không mất phiên vẽ. (5) Liên kết sai vai (id bảng
+  trắng gắn vào ô tài liệu) được workspace tự chuyển
+  sang pane phải.
+- **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
+
+### DEC-033 — Export Engine: flatten PDF bằng pdf-lib qua ánh xạ viewport của PDF.js (TASK-09)
+
+- **Bối cảnh:** DEC-017 chốt PDF chỉ xem + chú thích phủ,
+  xuất bản flatten khi chia sẻ. TASK-07E đã xử lý phía
+  DOCX (DEC-030); sinh PDF bằng code thuộc TASK-09.
+- **Quyết định:** (1) Engine ở `src/engines/pdf/
+  exportPdf.ts`, dùng pdf-lib 1.17.1 (MIT), 100%
+  client-side; file gốc không bao giờ bị ghi đè — mọi
+  thao tác trên bản sao trong RAM, kết quả là Blob mới
+  để tải xuống (DEC-005). (2) Ánh xạ tọa độ: world
+  (khung trang hiển thị tại scale 1, đơn vị điểm PDF)
+  → PDF user space đi qua `convertToPdfPoint` của
+  PageViewport qua `createPdfAnnotationMapping` —
+  đúng đường overlay hiển thị dùng, nên khớp 1:1 ở
+  mọi rotation; điểm theo gốc CropBox được cộng
+  offset CropBox khi vẽ bằng pdf-lib (user space gốc
+  MediaBox). (3) Hai chế độ: VECTOR — outline
+  perfect-freehand (cùng `strokeOutlinePoints` của
+  renderer) → `drawSvgPath`, hình khối → primitive
+  pdf-lib, chữ → Helvetica chuẩn (ký tự ngoài WinAnsi
+  bỏ kèm cảnh báo vì phông chuẩn không nhúng được
+  tiếng Việt); RASTER — vẽ lại bằng chính `drawObject`
+  của Drawing Engine ở tỉ lệ 3× rồi nhúng PNG phủ
+  trang (giữ được mọi loại object kể cả chữ tiếng
+  Việt). (4) Phạm vi trang: tất cả, hoặc chỉ trang
+  có chú thích (tạo tài liệu mới bằng copyPages).
+  (5) UI dùng chung một `PdfExportDialog` cho
+  Document Mode và Split Mode, có tiến trình theo
+  trang; tùy chọn "PDF gốc (sạch)" tải xuống chính
+  Blob gốc.
+- **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
+
+### DEC-034 — PWA: Service Worker tự sinh ở bước build, pre-cache toàn bộ dist (TASK-10)
+
+- **Bối cảnh:** DEC-002/DEC-011 yêu cầu offline đầy đủ
+  sau lần tải đầu và cài đặt được lên thiết bị. App
+  không có backend; mọi dữ liệu đã ở IndexedDB. Phần
+  còn thiếu duy nhất là app shell chạy offline.
+- **Quyết định:** (1) Không dùng vite-plugin-pwa: một
+  script build riêng (`scripts/generate-sw.mjs`) quét
+  toàn bộ `dist/` sau `vite build`, tính phiên bản =
+  hash nội dung các file, và sinh `dist/sw.js` với
+  danh sách pre-cache đầy đủ (HTML, bundle JS/CSS đã
+  hash, PDF.js worker, icons, manifest) — không phụ
+  thuộc vào vòng đời hỗ trợ Vite của plugin ngoài.
+  (2) Chiến lược: install pre-cache toàn bộ + KHÔNG
+  tự skipWaiting (bản mới chờ người dùng bấm "Cập
+  nhật" trong app); activate xóa cache khác phiên
+  bản + claim; fetch GET cùng origin: điều hướng →
+  index.html từ cache (SPA offline), tài nguyên →
+  cache-first (thiếu thì mạng + lưu bổ sung). Mọi
+  `cache.match` đều dùng `ignoreVary: true` — bài
+  học QA thực tế: máy chủ tĩnh trả `Vary: Origin`
+  cho assets, không bỏ qua Vary thì bản cache không
+  khớp request của trình duyệt và app gãy offline
+  dù cache đầy đủ. (3) Manifest tĩnh ở `public/`,
+  icons PNG sinh bằng script thuần Node
+  (`scripts/generate-icons.mjs`, không thêm
+  dependency đồ họa). (4) UI: `PwaStatus` — banner
+  cập nhật, nút cài đặt từ `beforeinstallprompt`
+  (ẩn khi đã standalone), huy hiệu ngoại tuyến kèm
+  khẳng định dữ liệu an toàn trên thiết bị. Đăng ký
+  SW chỉ ở bản production.
+- **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
+
 ---
 
 ## Đề xuất chờ xác nhận — CHƯA PHẢI QUYẾT ĐỊNH

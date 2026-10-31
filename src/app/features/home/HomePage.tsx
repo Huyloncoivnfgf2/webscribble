@@ -10,6 +10,8 @@ export interface HomePageProps {
   onOpenDocument: () => void
   onCreateDocument: () => void
   onOpenWhiteboard: () => void
+  /** Mở thẳng một tài liệu cụ thể từ mục Tài liệu gần đây. */
+  onOpenRecentDocument: (documentId: string) => void
 }
 
 export function HomePage({
@@ -18,6 +20,7 @@ export function HomePage({
   onOpenDocument,
   onCreateDocument,
   onOpenWhiteboard,
+  onOpenRecentDocument,
 }: HomePageProps) {
   return (
     <div className="flex flex-col gap-8">
@@ -28,7 +31,7 @@ export function HomePage({
         onOpenWhiteboard={onOpenWhiteboard}
       />
       <WorkspaceModes activeMode={activeMode} onSelectMode={onSelectMode} />
-      <RecentDocuments />
+      <RecentDocuments onOpenDocument={onOpenRecentDocument} />
     </div>
   )
 }

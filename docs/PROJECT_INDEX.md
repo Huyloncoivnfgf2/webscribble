@@ -50,22 +50,46 @@ toàn bộ lịch sử hội thoại.
 
 ## 4. Task hiện tại
 
-- **Vừa hoàn thành:** TASK-05G — Integration & Testing của
-  Drawing Engine (48 test mới, tổng 321 đạt; sửa bug StrokeBuilder
-  đánh rơi điểm nhả bút; Chromium headless 16/16). Trước đó:
-  TASK-05F (History Manager), TASK-05E (Selection & Eraser),
+- **Vừa hoàn thành:** TASK-08B — Document Manager & Library
+  UI (13 test mới, tổng 475 đạt; đổi tên bền, panel dung
+  lượng + cảnh báo quota 80%, Recent Documents dữ liệu
+  thật). Trước đó: TASK-06F-A — kiểm chứng + sửa race
+  condition của dirty tracking (generation counter; 6 test
+  hồi quy mới, tổng 462 đạt). Trước đó: TASK-06F — PDF
+  Integration & Testing
+  (TASK-06 hoàn tất cả 6 subtask; 11 test tích hợp mới, tổng
+  456 đạt; sửa 1 lỗi ghi đè khi đóng phiên chỉ-đọc; ISSUE-015
+  đa tab). Trước đó: TASK-06E — Minimal React PDF Viewer (17
+  test mới, tổng 445 đạt; Browser QA dev 26/26 + production
+  14/14 trên UI thật). Trước đó: TASK-06D — PDF Annotation
+  Overlay (19 test
+  mới, tổng 428 đạt; Browser QA 50/50 cả 4 rotation). Trước đó:
+  TASK-06C — Annotation Engine (21 test mới,
+  tổng 409 đạt; Browser QA qua reload trang 5/5). Trước đó:
+  TASK-06B — Page Rendering & Geometry (23
+  test mới, tổng 388 đạt; Browser QA 16/16 ở DPR 1 và 2). Trước
+  đó: TASK-06A — PDF.js & Document Loader (17 unit
+  test mới, tổng 365 đạt; worker local kiểm chứng dev + production
+  7/7). Trước đó: TASK-08A — Storage Foundation (27 unit test
+  mới, tổng 348 đạt; IndexedDB thật qua reload 8/8). Trước đó:
+  TASK-05G (Integration & Testing) và toàn bộ TASK-05 — đã commit
+  `7aa608e`, TASK-05F (History Manager), TASK-05E (Selection &
+  Eraser),
   TASK-05D (Shape & Text Engine), TASK-05C (Stroke Engine &
   Renderer), TASK-05B (Input Manager), TASK-05A (Data Model &
   Surface Interface), TASK-04 (UI shell, commit `b4aa4ae`), TASK-03,
   TASK-02, TASK-01, TASK-00.
-- **Đang thực hiện:** TASK-05 — Drawing Engine (phần engine đã
-  xong gồm kiểm thử tích hợp; còn kiểm chứng thiết bị thật — chờ
-  phần cứng).
-- **Kế tiếp dự kiến:** TASK-06 — PDF Engine (chờ giao).
+- **Đang thực hiện:** Không có task đang chạy. TASK-08A,
+  TASK-08B và TASK-06 (06A → 06F-A) đã xong (chưa commit —
+  chờ duyệt).
+- **Kế tiếp dự kiến:** TASK-08C — Whiteboard/Workspace/
+  Backup (theo replan); hoặc TASK-07 — Word Engine (theo
+  roadmap gốc). Chờ chủ dự án giao.
 - Chi tiết trạng thái: `CURRENT_STATE.md`. Không tự ý bắt đầu task mới.
 
 ## 5. Phiên bản tài liệu
 
-- **Docs version:** 1.13
-- **Ngày cập nhật:** 2026-10-30
+- **Docs version:** 1.34
+- **Phiên bản sản phẩm:** **v1.0.0 — MVP Complete** (phát hành 2026-10-31)
+- **Ngày cập nhật:** 2026-10-31
 - **Task tạo:** TASK-00

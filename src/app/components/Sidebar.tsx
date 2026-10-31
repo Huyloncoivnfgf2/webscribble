@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import {
   Clock,
+  Columns2,
   FolderOpen,
   House,
   NotebookPen,
@@ -23,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: 'recent', icon: Clock },
   { key: 'documents', icon: FolderOpen },
   { key: 'whiteboard', icon: PenLine },
+  { key: 'split', icon: Columns2 },
   { key: 'settings', icon: Settings },
 ]
 

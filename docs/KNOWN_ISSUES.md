@@ -75,6 +75,12 @@ Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RE
 - **Ảnh hưởng:** Word Engine với tài liệu học tập có công thức.
 - **Hướng xử lý:** Đưa bộ chuyển OMML → MathML và xử lý VML vào phạm vi khảo
   sát của TASK-01/TASK-07.
+- **Cập nhật TASK-07A (2026-10-31):** đường nhập DOCX đã tồn tại
+  (Mammoth → sanitize → mô hình nội dung); OMML **vẫn bị Mammoth
+  bỏ qua khi nhập** — tài liệu có công thức sẽ thiếu công thức
+  trong nội dung đã chuyển đổi (file gốc còn nguyên trong thư
+  viện). Chuyển OMML → MathML tiền xử lý vẫn là việc nghiên
+  cứu riêng (ứng viên tái sử dụng từ StudyWrite theo DEC-013).
 - **Trạng thái:** OPEN (2026-10-30)
 
 ## ISSUE-005 — Giới hạn dung lượng lưu trữ cục bộ của trình duyệt
@@ -88,6 +94,20 @@ Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RE
   toàn thư viện + cảnh báo sao lưu định kỳ + xin `storage.persist()` —
   giảm rủi ro *mất dữ liệu* khi bị eviction, nhưng **không** thay thế
   việc đo quota thực tế và cảnh báo gần đầy ở TASK-08. Issue giữ OPEN.
+- **Cập nhật TASK-08A (2026-10-31):** StorageManager đã triển khai
+  `navigator.storage.persist()`/`persisted()`/`estimate()` (có
+  adapter, an toàn khi thiếu API) và nền Dexie/IndexedDB đã chạy
+  thật. Đo tại Chromium headless trên VM: quota ≈ 10 GB, trạng thái
+  persisted mặc định chưa được cấp. Vẫn OPEN: quota/thu hồi dữ liệu
+  trên thiết bị thật (đặc biệt iOS/Safari) chưa đo được, và UI cảnh
+  báo gần đầy thuộc TASK-08B.
+- **Cập nhật TASK-08B (2026-10-31):** UI đã hoàn thành — thư viện
+  hiển thị dung lượng đã dùng/quota ước tính + tỷ lệ, cảnh báo từ
+  ngưỡng 80%, trạng thái lưu trữ bền kèm nút xin cấp, và trạng
+  thái "không đo được" trung thực khi API không khả dụng (kiểm
+  chứng bằng giả lập trình duyệt ở cả ba trạng thái). Phần còn
+  lại của issue chỉ là đo quota/thu hồi trên THIẾT BỊ THẬT (đặc
+  biệt iOS/Safari) — chưa có phần cứng để kiểm chứng.
 - **Trạng thái:** OPEN (2026-10-30)
 
 ## ISSUE-006 — Hỗ trợ bút cảm ứng/pressure không đồng đều giữa các trình duyệt
@@ -187,6 +207,12 @@ Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RE
   không mua Tiptap Pro/Cloud. Độ phủ định dạng của bộ map sẽ đo bằng
   prototype trong TASK-07 (việc đã lên lịch, không còn là khoảng trống
   chiến lược).
+- **Cập nhật đóng vòng (TASK-07E/07F, 2026-10-31):** bộ map đã xây
+  xong và ĐO ĐƯỢC độ phủ: kiểm thử round-trip xuất → nhập lại giữ
+  heading/căn lề/danh sách lồng/bảng/highlight/cỡ chữ/ảnh; LibreOffice
+  mở và chuyển đổi thành công file xuất (DEC-030). Phần chú thích khi
+  xuất đã chốt: không nhúng vào DOCX — bản phẳng kèm chú thích qua
+  đường in/PDF của trình duyệt; sinh PDF bằng code thuộc TASK-09.
 
 ## ISSUE-011 — Cache tài nguyên lớn cho offline lần đầu
 - **Loại:** Rủi ro kỹ thuật.
@@ -197,7 +223,7 @@ Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RE
 - **Ảnh hưởng:** PWA/Offline (TASK-10) và ấn tượng lần đầu của người dùng.
 - **Hướng xử lý:** Đo dung lượng gói ở TASK-01; thiết kế chiến lược cache và
   cập nhật ở TASK-10.
-- **Trạng thái:** OPEN (2026-10-30)
+- **Trạng thái:** RESOLVED (2026-10-31, TASK-10) — Service Worker tự sinh ở bước build pre-cache toàn bộ dist gồm PDF.js worker (DEC-034); đã kiểm chứng offline trọn vẹn trên bản production (mở app, xem/vẽ PDF, xuất file khi mất mạng).
 
 ## ISSUE-012 — Infinite Canvas cho Whiteboard Mode chưa được đánh giá
 - **Loại:** Chưa xác minh / quyết định còn thiếu.
@@ -239,6 +265,11 @@ Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RE
   theo bề mặt** (tránh hoàn tác nhầm vùng không nhìn thấy); bảng trắng
   trong Split dùng chung kho thực thể với Whiteboard Mode. Chi tiết ở
   `docs/research/THREE_MODES_ARCHITECTURE_RESEARCH.md` Phần 3.
+- **Cập nhật triển khai (TASK-13, 2026-10-31):** mô hình đã thành
+  hiện thực đúng như thiết kế — workspace tham chiếu hai bề mặt,
+  tự lưu và undo/redo tách riêng theo bề mặt, tỉ lệ chia thuộc
+  workspace (DEC-032). Vết liên kết phiên lưu ở localStorage
+  của thiết bị.
 - **Trạng thái:** RESOLVED (2026-10-30, tại TASK-02) — Mô hình đã được
   chốt tại **DEC-020** (Workspace tham chiếu hai Surface; tự lưu theo
   Surface; Undo/Redo riêng theo Surface; khôi phục cả workspace) và phản
@@ -276,3 +307,47 @@ Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RE
   khi làm TASK-13/TASK-06.
 - **Trạng thái:** OPEN (2026-10-30) — phần kỹ thuật và 2/3 quyết định đã
   có kết luận; còn 2 quyết định sản phẩm nhỏ nêu trên.
+
+## ISSUE-015 — Hai tab cùng sửa một tài liệu: ghi sau thắng (last-writer-wins)
+
+- **Phát hiện:** TASK-06F (2026-10-31), kiểm thử hai tab trên cùng
+  một browser context (cùng IndexedDB).
+- **Hiện tượng:** mỗi surface (một trang của một tài liệu) được lưu
+  bằng cách ghi đè toàn bộ record. Nếu hai tab cùng mở một tài liệu
+  và cùng vẽ trên cùng một trang, bản lưu của tab ghi sau sẽ thay
+  toàn bộ bản của tab ghi trước — nét vẽ của tab trước mất, không
+  có hợp nhất (merge) và không có cảnh báo xung đột. Dữ liệu không
+  hỏng cấu trúc: trạng thái cuối luôn là một bản nhất quán của
+  đúng một tab (đã kiểm chứng bằng pixel: mực sau cùng khớp đúng
+  một nét).
+- **Đã giảm nhẹ trong TASK-06F:** trường hợp tab chỉ MỞ XEM rồi
+  đóng cũng ghi đè đã được sửa tại gốc (session.close() chỉ ghi
+  khi có thay đổi thật — xem CHANGELOG TASK-06F), nên rủi ro chỉ
+  còn khi hai tab cùng THỰC SỰ chỉnh sửa đồng thời.
+- **Đánh giá:** chấp nhận được cho sản phẩm local-first một người
+  dùng ở giai đoạn này; người dùng thường chỉ mở một tab. Không tự
+  triển khai đồng bộ đa tab trong TASK-06F theo brief.
+- **Phương án đề xuất khi cần xử lý:** (1) tối thiểu — cảnh báo
+  "tài liệu đang mở ở tab khác" bằng BroadcastChannel/heartbeat
+  trong IndexedDB; (2) đầy đủ — khóa ghi theo surface kèm kiểm tra
+  updatedAt lạc quan (optimistic concurrency): saveSurface từ chối
+  khi record đã mới hơn thời điểm session mở, UI báo xung đột để
+  người dùng chọn. Cả hai đều ngoài phạm vi hiện tại.
+- **Trạng thái:** OPEN (2026-10-31) — rủi ro đã biết, có phương án.
+
+## ISSUE-016 — Chú thích trên DOCX không bám theo chữ khi sửa nội dung
+
+- **Phát hiện:** thiết kế tại TASK-07-SCOPE, chốt tại TASK-07D
+  (2026-10-31) — **DEC-029**.
+- **Hiện tượng:** nét chú thích trên tài liệu DOCX neo theo tọa độ
+  tuyệt đối trong không gian nội dung của editor. Nếu người dùng
+  chèn/xóa chữ ở phía trên, hoặc cửa sổ đổi chiều ngang làm chữ
+  xuống dòng lại, chữ dời đi nhưng nét vẽ giữ nguyên vị trí tuyệt
+  đối → nét có thể lệch so với đoạn chữ nó từng trỏ vào. Dữ liệu
+  nét không mất và không hỏng.
+- **Đánh giá:** giới hạn đã CHẤP NHẬN cho version 1 và được công
+  bố ngay trong thanh công cụ chú thích của editor. Neo theo vị
+  trí ký tự (character anchoring) đòi hỏi mô hình neo văn bản
+  riêng gắn với ProseMirror — ngoài phạm vi MODULE 07.
+- **Trạng thái:** OPEN — giới hạn đã biết, đã công bố cho người
+  dùng; xử lý khi có nhu cầu neo theo chữ thực tế.
