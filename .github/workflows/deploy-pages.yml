@@ -25,9 +25,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # Pages phải được bật một lần trong Settings > Pages
+      # (Source: GitHub Actions) — token của workflow không
+      # tự bật được ở lần đầu (configure-pages enablement
+      # từng lỗi "Resource not accessible by integration").
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
