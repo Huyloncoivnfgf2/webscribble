@@ -2,6 +2,7 @@ import {
   DrawingEngine,
   type CanvasLike,
   type DrawingSurface,
+  type PinchGestureEvent,
   type PointerTargetLike,
 } from '../../../engines/drawing/index'
 import type {
@@ -11,6 +12,7 @@ import type {
 import type { AutosaveState } from '../../../data/index'
 import {
   clampPageIndex,
+  clampScale,
   computeFitScale,
   zoomInScale,
   zoomOutScale,
@@ -89,6 +91,13 @@ export interface WhiteboardControllerDeps {
   cancelFrame?: (handle: number) => void
 }
 
+/** Phần tối thiểu của khung cuộn mà pinch (TASK-14B) cần. */
+export interface WhiteboardScrollContainerLike {
+  scrollLeft: number
+  scrollTop: number
+  getBoundingClientRect(): { left: number; top: number }
+}
+
 export class WhiteboardController {
   private readonly store: WhiteboardStore
   private readonly annotationEngine: AnnotationEngine
@@ -105,6 +114,18 @@ export class WhiteboardController {
   private unsubscribeSurface: (() => void) | null = null
   private viewport = { width: 0, height: 0 }
   private fitMode = true
+  /** Khung cuộn của view (cho pinch pan/zoom — TASK-14B). */
+  private scrollContainer: WhiteboardScrollContainerLike | null = null
+  private pinch: {
+    startScale: number
+    startDistance: number
+    anchorWorld: { x: number; y: number }
+  } | null = null
+  private pinchAnchorFrame: number | null = null
+  private pinchAnchorPending: {
+    anchorWorld: { x: number; y: number }
+    clientPoint: { x: number; y: number }
+  } | null = null
   private saveWatchTimer: ReturnType<typeof setTimeout> | null = null
   private saveWatchLeft = 0
 
@@ -222,6 +243,7 @@ export class WhiteboardController {
       element: canvas as unknown as PointerTargetLike & CanvasLike,
       getCamera: () => ({ x: 0, y: 0, zoom: this.state.scale }),
       tool: 'pen',
+      onPinchGesture: (event) => this.handlePinchGesture(event),
       ...(this.requestFrame !== undefined ? { requestFrame: this.requestFrame } : {}),
       ...(this.cancelFrame !== undefined ? { cancelFrame: this.cancelFrame } : {}),
     })
@@ -323,6 +345,94 @@ export class WhiteboardController {
     this.fitMode = false
     this.setState({ scale: zoomOutScale(this.state.scale) })
     this.resizeEngine()
+  }
+
+  // ── Pinch hai ngón (TASK-14B) ─────────────────────────────
+  // Bảng trắng dựng lại rẻ nên pinch áp TRỰC TIẾP: mỗi
+  // 'update' đổi scale theo tỉ lệ khoảng cách rồi neo điểm
+  // world dưới trung điểm hiện tại bằng scroll — pan và zoom
+  // hợp nhất qua cùng công thức neo (ngón di chuyển thuần túy
+  // thì scale giữ nguyên, scroll vẫn đi theo = pan).
+
+  /** View gắn khung cuộn của nó để pinch chỉnh được scroll. */
+  bindScrollContainer(container: WhiteboardScrollContainerLike | null): void {
+    this.scrollContainer = container
+  }
+
+  private handlePinchGesture(event: PinchGestureEvent): void {
+    if (event.phase === 'start') {
+      const scale = this.state.scale
+      this.pinch = {
+        startScale: scale,
+        startDistance: event.distance,
+        anchorWorld: {
+          x: event.midpoint.x / scale,
+          y: event.midpoint.y / scale,
+        },
+      }
+      return
+    }
+    const pinch = this.pinch
+    if (pinch === null) return
+    if (event.phase === 'update') {
+      if (event.distance > 0 && pinch.startDistance > 0) {
+        const next = clampScale(pinch.startScale * (event.distance / pinch.startDistance))
+        if (next !== this.state.scale) {
+          this.fitMode = false
+          this.setState({ scale: next })
+          this.resizeEngine()
+        }
+      }
+      this.schedulePinchAnchor(pinch.anchorWorld, event.midpointClient)
+      return
+    }
+    // phase === 'end': neo lần cuối tại trung điểm kết thúc.
+    this.pinch = null
+    this.schedulePinchAnchor(pinch.anchorWorld, event.midpointClient)
+  }
+
+  /**
+   * Lên lịch neo sau khi layout đổi xong (frame kế tiếp): đọc
+   * rect thật lúc áp dụng nên không lệ thuộc thời điểm React
+   * render lại khung trang theo scale mới. Nhiều update liên
+   * tiếp chỉ giữ lần neo gần nhất.
+   */
+  private schedulePinchAnchor(
+    anchorWorld: { x: number; y: number },
+    clientPoint: { x: number; y: number },
+  ): void {
+    this.pinchAnchorPending = { anchorWorld, clientPoint }
+    if (this.pinchAnchorFrame !== null) return
+    const raf = (globalThis as { requestAnimationFrame?: unknown })
+      .requestAnimationFrame
+    if (typeof raf !== 'function') {
+      this.applyPinchAnchor()
+      return
+    }
+    this.pinchAnchorFrame = (raf as (cb: () => void) => number).call(
+      globalThis,
+      () => {
+        this.pinchAnchorFrame = null
+        this.applyPinchAnchor()
+      },
+    )
+  }
+
+  private applyPinchAnchor(): void {
+    const pending = this.pinchAnchorPending
+    this.pinchAnchorPending = null
+    const container = this.scrollContainer
+    const canvas = this.canvas
+    if (pending === null || container === null || canvas === null) return
+    const containerRect = container.getBoundingClientRect()
+    const canvasRect = canvas.getBoundingClientRect()
+    const originX = canvasRect.left - containerRect.left + container.scrollLeft
+    const originY = canvasRect.top - containerRect.top + container.scrollTop
+    const scale = this.state.scale
+    container.scrollLeft =
+      originX + pending.anchorWorld.x * scale - (pending.clientPoint.x - containerRect.left)
+    container.scrollTop =
+      originY + pending.anchorWorld.y * scale - (pending.clientPoint.y - containerRect.top)
   }
 
   fitToViewport(): void {

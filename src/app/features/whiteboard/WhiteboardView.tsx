@@ -171,6 +171,8 @@ export function WhiteboardView({
     if (canvas === null) return
     void controller.open(documentId, canvas)
     const scroll = scrollRef.current
+    // TASK-14B: pinch hai ngón cần khung cuộn để pan/neo zoom.
+    controller.bindScrollContainer(scroll)
     // TASK-14A: tự cuộn khi vẽ gần mép dưới/phải của khung bảng.
     const detachAutoScroll =
       scroll !== null
@@ -203,6 +205,7 @@ export function WhiteboardView({
         : null
     if (frame !== null && frameObserver !== null) frameObserver.observe(frame)
     return () => {
+      controller.bindScrollContainer(null)
       detachAutoScroll?.()
       observer?.disconnect()
       frameObserver?.disconnect()

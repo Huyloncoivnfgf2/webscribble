@@ -5,6 +5,39 @@
 
 ## Lịch sử
 
+### TASK-14B — 2026-11-01 — Gesture hai ngón pan/zoom (docs v1.37)
+
+- **input.ts:** PointerInputManager theo dõi pointer
+  thứ hai; cả hai pointer là touch thì chuyển sang
+  gesture pinch (sự kiện start/update/end mang trung
+  điểm + khoảng cách ở cả hệ tọa độ canvas và client),
+  ngừng phát sự kiện vẽ; ngón còn lại sau gesture bị
+  tiêu thụ tới khi nhấc hẳn. Chốt an toàn lòng bàn
+  tay: pen/mouse + touch KHÔNG kích hoạt gesture;
+  không đăng ký onGesture thì hành vi y như cũ.
+- **engine.ts:** `abandonInProgress()` mới (nét/hình
+  -> abandon, vùng chọn dở -> bỏ, tẩy dở -> chốt một
+  lệnh) chạy ngay khi gesture bắt đầu; option
+  `onPinchGesture` chuyển tiếp cho tầng view.
+  coordinates.ts thêm hàm thuần `pinchCamera`.
+- **Áp dụng:** WhiteboardController pinch TRỰC TIẾP
+  (scale theo tỉ lệ khoảng cách + neo điểm world
+  dưới trung điểm bằng scroll, đọc rect sau layout);
+  PdfViewerController pan trực tiếp, zoom CHỐT khi
+  kết thúc gesture tại điểm neo (trang dựng lại một
+  lần — dựng theo từng update tốn ~260ms/trang).
+  SplitPdfPane hưởng pinch PDF qua controller chung.
+- **Kiểm chứng:** 11 test mới (inputGesture +
+  pinchCamera): **621/621 test (58 file)**, lint 0
+  lỗi, build đạt. Browser QA production bằng CDP
+  touch **9/9**: một ngón vẽ thành nét; ngón hai
+  chạm -> nét dở bị hủy (mực về 0); pinch bảng
+  trắng 42% -> 124% trực tiếp; pan hai ngón cuộn
+  đúng, scale giữ nguyên; PDF pan trực tiếp +
+  pinch nhấc tay chốt 94% -> 283%; 0 lỗi console.
+  Cảm giác pinch/palm trên thiết bị thật + Safari
+  vẫn thuộc ISSUE-006.
+
 ### TASK-14A — 2026-11-01 — Tự cuộn khi viết (docs v1.36)
 
 - **File mới:** `src/engines/drawing/autoScroll.ts`

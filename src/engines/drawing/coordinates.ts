@@ -78,3 +78,38 @@ export function zoomCameraAtScreenPoint(
     zoom: nextZoom,
   }
 }
+
+/** Một trạng thái pinch: trung điểm (màn hình) + khoảng cách hai ngón. */
+export interface PinchState {
+  midpoint: Point
+  distance: number
+}
+
+/**
+ * Camera mới sau một bước pinch (TASK-14B): pan theo độ dời của
+ * trung điểm, rồi zoom tại trung điểm MỚI theo tỉ lệ khoảng cách
+ * (điểm world dưới trung điểm được giữ nguyên qua bước zoom).
+ * Khoảng cách không hợp lệ (0/NaN) -> chỉ pan, không zoom; hệ số
+ * zoom bằng 1 -> giữ nguyên camera sau pan.
+ */
+export function pinchCamera(
+  camera: Camera,
+  previous: PinchState,
+  current: PinchState,
+): Camera {
+  const panned = panCameraByScreenDelta(camera, {
+    x: current.midpoint.x - previous.midpoint.x,
+    y: current.midpoint.y - previous.midpoint.y,
+  })
+  if (
+    !(previous.distance > 0) ||
+    !(current.distance > 0) ||
+    !Number.isFinite(previous.distance) ||
+    !Number.isFinite(current.distance)
+  ) {
+    return panned
+  }
+  const factor = current.distance / previous.distance
+  if (!(factor > 0) || !Number.isFinite(factor) || factor === 1) return panned
+  return zoomCameraAtScreenPoint(panned, current.midpoint, panned.zoom * factor)
+}

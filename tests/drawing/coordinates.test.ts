@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createCamera,
   panCameraByScreenDelta,
+  pinchCamera,
   screenToWorld,
   worldToScreen,
   zoomCameraAtScreenPoint,
@@ -91,5 +92,51 @@ describe('zoomCameraAtScreenPoint', () => {
     const camera = createCamera()
     expect(() => zoomCameraAtScreenPoint(camera, { x: 0, y: 0 }, 0)).toThrow()
     expect(() => createCamera({ zoom: -1 })).toThrow()
+  })
+})
+
+describe('pinchCamera', () => {
+  it('zoom x2 tại trung điểm đứng yên: điểm world dưới trung điểm giữ nguyên vị trí', () => {
+    const camera = createCamera()
+    const anchor = screenToWorld({ x: 200, y: 150 }, camera)
+    const next = pinchCamera(
+      camera,
+      { midpoint: { x: 200, y: 150 }, distance: 100 },
+      { midpoint: { x: 200, y: 150 }, distance: 200 },
+    )
+    expect(next.zoom).toBeCloseTo(2)
+    const projected = worldToScreen(anchor, next)
+    expect(projected.x).toBeCloseTo(200)
+    expect(projected.y).toBeCloseTo(150)
+  })
+
+  it('pan thuần (khoảng cách không đổi): điểm world đi theo trung điểm', () => {
+    const camera = createCamera()
+    const anchor = screenToWorld({ x: 200, y: 150 }, camera)
+    const next = pinchCamera(
+      camera,
+      { midpoint: { x: 200, y: 150 }, distance: 120 },
+      { midpoint: { x: 230, y: 170 }, distance: 120 },
+    )
+    expect(next.zoom).toBe(1)
+    const projected = worldToScreen(anchor, next)
+    expect(projected.x).toBeCloseTo(230)
+    expect(projected.y).toBeCloseTo(170)
+  })
+
+  it('khoảng cách 0 hoặc NaN: chỉ pan, không ném lỗi, không zoom', () => {
+    const camera = createCamera()
+    const next = pinchCamera(
+      camera,
+      { midpoint: { x: 0, y: 0 }, distance: 0 },
+      { midpoint: { x: 10, y: 5 }, distance: 80 },
+    )
+    expect(next.zoom).toBe(1)
+    const nanNext = pinchCamera(
+      camera,
+      { midpoint: { x: 0, y: 0 }, distance: Number.NaN },
+      { midpoint: { x: 10, y: 5 }, distance: 80 },
+    )
+    expect(nanNext.zoom).toBe(1)
   })
 })

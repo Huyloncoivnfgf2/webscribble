@@ -17,6 +17,15 @@
  * - Chỉ MỘT pointer được theo dõi tại một thời điểm: pointer thứ hai
  *   (kể cả chạm đa điểm) bị bỏ qua hoàn toàn — TASK-05B không triển
  *   khai multi-touch gesture.
+ * - TASK-14B bổ sung gesture hai ngón: khi pointer THỨ HAI chạm
+ *   xuống trong lúc pointer đầu đang hoạt động và CẢ HAI đều là
+ *   cảm ứng (touch), manager ngừng phát sự kiện vẽ và chuyển sang
+ *   phát sự kiện pinch (start/update/end) qua callback `onGesture`
+ *   — tầng trên tự hủy nét đang vẽ và áp pan/zoom. Điều kiện "cả
+ *   hai là touch" là chốt an toàn lòng bàn tay: bút stylus đang
+ *   vẽ + tay chạm vào KHÔNG kích hoạt gesture. Một pointer (mọi
+ *   loại thiết bị) vẽ bình thường như trước; không có `onGesture`
+ *   thì hành vi giống hệt TASK-05B.
  */
 
 import { screenToWorld, type Camera } from './coordinates'
@@ -65,6 +74,30 @@ export interface PointerInputEvent {
 }
 
 export type PointerInputHandler = (event: PointerInputEvent) => void
+
+export type PinchGesturePhase = 'start' | 'update' | 'end'
+
+/**
+ * Sự kiện gesture hai ngón (TASK-14B). Tọa độ màn hình tương đối
+ * với góc trên-trái của phần tử đích (cùng hệ với
+ * `PointerSample.screenPosition`); tọa độ client là tọa độ cửa
+ * sổ thô — tầng view dùng hiệu số của nó để pan khung cuộn mà
+ * không bị nhiễu bởi chính độ cuộn đã áp.
+ */
+export interface PinchGestureEvent {
+  phase: PinchGesturePhase
+  /** Trung điểm hai pointer (tọa độ phần tử). */
+  midpoint: Point
+  /** Khoảng cách hai pointer (CSS px). */
+  distance: number
+  /** Trung điểm hai pointer (tọa độ client). */
+  midpointClient: Point
+  previousMidpoint: Point
+  previousDistance: number
+  previousMidpointClient: Point
+}
+
+export type PinchGestureHandler = (event: PinchGestureEvent) => void
 
 /**
  * Phần tối thiểu của DOM PointerEvent mà Input Manager cần. Trình
@@ -188,6 +221,11 @@ export interface PointerInputManagerOptions {
    */
   getCamera: () => Camera
   onEvent: PointerInputHandler
+  /**
+   * Nhận sự kiện gesture hai ngón (TASK-14B). Thiếu callback này
+   * thì pointer thứ hai bị bỏ qua như trước — không gesture.
+   */
+  onGesture?: PinchGestureHandler
 }
 
 /**
@@ -200,17 +238,43 @@ export interface PointerInputManagerOptions {
  * set pointer capture ngay khi down để move/up ngoài phần tử vẫn tới
  * được manager; capture được giải phóng khi up/cancel.
  */
+/** Trạng thái một gesture hai ngón đang diễn ra (TASK-14B). */
+interface GestureState {
+  firstId: number
+  secondId: number
+  firstScreen: Point
+  secondScreen: Point
+  firstClient: Point
+  secondClient: Point
+  lastMidpoint: Point
+  lastDistance: number
+  lastMidpointClient: Point
+}
+
 export class PointerInputManager {
   private readonly target: PointerTargetLike
   private readonly getCamera: () => Camera
   private readonly onEvent: PointerInputHandler
+  private readonly onGesture: PinchGestureHandler | undefined
   private attached = false
   private currentPointerId: number | null = null
+  /** Loại thiết bị + vị trí gần nhất của pointer đang vẽ (để xét gesture). */
+  private activeKind: PointerKind | null = null
+  private activeScreen: Point | null = null
+  private activeClient: Point | null = null
+  private gesture: GestureState | null = null
+  /**
+   * Các pointer từng thuộc một gesture đã kết thúc mà chưa nhấc
+   * lên: sự kiện của chúng bị nuốt cho tới khi nhấc hẳn, để phần
+   * còn lại của thao tác hai ngón không biến thành nét vẽ.
+   */
+  private readonly consumed = new Set<number>()
 
   constructor(options: PointerInputManagerOptions) {
     this.target = options.target
     this.getCamera = options.getCamera
     this.onEvent = options.onEvent
+    this.onGesture = options.onGesture
   }
 
   /** ID của pointer đang hoạt động, hoặc null khi không có thao tác nào. */
@@ -249,10 +313,22 @@ export class PointerInputManager {
    * bị bỏ qua và pointer chỉ hoạt động lại từ lần down kế tiếp.
    */
   reset(): void {
+    if (this.gesture !== null) {
+      this.releaseCapture(this.gesture.firstId)
+      this.releaseCapture(this.gesture.secondId)
+      this.gesture = null
+    }
+    for (const id of this.consumed) {
+      this.releaseCapture(id)
+    }
+    this.consumed.clear()
     if (this.currentPointerId !== null) {
       this.releaseCapture(this.currentPointerId)
       this.currentPointerId = null
     }
+    this.activeKind = null
+    this.activeScreen = null
+    this.activeClient = null
   }
 
   private toSample(event: PointerEventLike): PointerSample | null {
@@ -279,17 +355,88 @@ export class PointerInputManager {
   }
 
   private handleDown = (event: PointerEventLike): void => {
-    if (this.currentPointerId !== null) return // đang có thao tác khác
+    if (this.gesture !== null) return // gesture đang chạy: pointer thứ ba bị bỏ qua
+    if (this.consumed.has(event.pointerId)) {
+      // Pointer này từng thuộc gesture mà sự kiện nhấc bị thất
+      // lạc: coi lần chạm xuống này là thao tác mới hoàn toàn.
+      this.consumed.delete(event.pointerId)
+    }
+    if (this.currentPointerId !== null) {
+      this.tryStartGesture(event)
+      return
+    }
     if (event.isPrimary === false) return // chỉ pointer chính
     if (typeof event.button === 'number' && event.button !== 0) return // chỉ nút chính
     const sample = this.toSample(event)
     if (sample === null) return
     this.currentPointerId = sample.pointerId
+    this.activeKind = sample.pointerType
+    this.activeScreen = { ...sample.screenPosition }
+    this.activeClient = { x: event.clientX, y: event.clientY }
     this.capture(sample.pointerId)
     this.onEvent({ type: 'down', sample })
   }
 
+  /**
+   * Xét bắt đầu gesture hai ngón khi pointer thứ hai chạm xuống.
+   * Chỉ kích hoạt khi có tầng trên đăng ký `onGesture`, pointer
+   * đang vẽ là touch và pointer mới cũng là touch (chốt an toàn
+   * lòng bàn tay cho stylus). Không đủ điều kiện thì pointer mới
+   * bị bỏ qua như hành vi cũ.
+   */
+  private tryStartGesture(event: PointerEventLike): void {
+    if (this.onGesture === undefined) return
+    if (this.currentPointerId === null) return
+    if (event.pointerId === this.currentPointerId) return
+    if (this.activeKind !== 'touch') return
+    if (normalizePointerKind(event.pointerType) !== 'touch') return
+    if (typeof event.button === 'number' && event.button !== 0) return
+    if (this.activeScreen === null || this.activeClient === null) return
+    const sample = this.toSample(event)
+    if (sample === null) return
+    this.capture(sample.pointerId)
+    const firstScreen = this.activeScreen
+    const firstClient = this.activeClient
+    const midpoint: Point = {
+      x: (firstScreen.x + sample.screenPosition.x) / 2,
+      y: (firstScreen.y + sample.screenPosition.y) / 2,
+    }
+    const distance = Math.hypot(
+      sample.screenPosition.x - firstScreen.x,
+      sample.screenPosition.y - firstScreen.y,
+    )
+    const midpointClient: Point = {
+      x: (firstClient.x + event.clientX) / 2,
+      y: (firstClient.y + event.clientY) / 2,
+    }
+    this.gesture = {
+      firstId: this.currentPointerId,
+      secondId: sample.pointerId,
+      firstScreen: { ...firstScreen },
+      secondScreen: { ...sample.screenPosition },
+      firstClient: { ...firstClient },
+      secondClient: { x: event.clientX, y: event.clientY },
+      lastMidpoint: midpoint,
+      lastDistance: distance,
+      lastMidpointClient: midpointClient,
+    }
+    this.onGesture({
+      phase: 'start',
+      midpoint,
+      distance,
+      midpointClient,
+      previousMidpoint: midpoint,
+      previousDistance: distance,
+      previousMidpointClient: midpointClient,
+    })
+  }
+
   private handleMove = (event: PointerEventLike): void => {
+    if (this.gesture !== null) {
+      this.handleGestureMove(event)
+      return
+    }
+    if (this.consumed.has(event.pointerId)) return
     if (this.currentPointerId === null || event.pointerId !== this.currentPointerId) return
     if (event.isPrimary === false) return
     // Ưu tiên các sự kiện con đã gộp (coalesced) để không mất điểm
@@ -302,17 +449,108 @@ export class PointerInputManager {
     for (const raw of rawEvents) {
       const sample = this.toSample(raw)
       if (sample !== null) {
+        this.activeScreen = { ...sample.screenPosition }
+        this.activeClient = { x: raw.clientX, y: raw.clientY }
         this.onEvent({ type: 'move', sample })
       }
     }
   }
 
+  /** Move trong lúc gesture: cập nhật vị trí của đúng pointer đó rồi phát 'update'. */
+  private handleGestureMove(event: PointerEventLike): void {
+    const gesture = this.gesture
+    if (gesture === null || this.onGesture === undefined) return
+    if (event.pointerId !== gesture.firstId && event.pointerId !== gesture.secondId) {
+      return
+    }
+    const sample = this.toSample(event)
+    if (sample === null) return
+    if (event.pointerId === gesture.firstId) {
+      gesture.firstScreen = { ...sample.screenPosition }
+      gesture.firstClient = { x: event.clientX, y: event.clientY }
+    } else {
+      gesture.secondScreen = { ...sample.screenPosition }
+      gesture.secondClient = { x: event.clientX, y: event.clientY }
+    }
+    const midpoint: Point = {
+      x: (gesture.firstScreen.x + gesture.secondScreen.x) / 2,
+      y: (gesture.firstScreen.y + gesture.secondScreen.y) / 2,
+    }
+    const distance = Math.hypot(
+      gesture.secondScreen.x - gesture.firstScreen.x,
+      gesture.secondScreen.y - gesture.firstScreen.y,
+    )
+    const midpointClient: Point = {
+      x: (gesture.firstClient.x + gesture.secondClient.x) / 2,
+      y: (gesture.firstClient.y + gesture.secondClient.y) / 2,
+    }
+    const eventOut: PinchGestureEvent = {
+      phase: 'update',
+      midpoint,
+      distance,
+      midpointClient,
+      previousMidpoint: gesture.lastMidpoint,
+      previousDistance: gesture.lastDistance,
+      previousMidpointClient: gesture.lastMidpointClient,
+    }
+    gesture.lastMidpoint = midpoint
+    gesture.lastDistance = distance
+    gesture.lastMidpointClient = midpointClient
+    this.onGesture(eventOut)
+  }
+
   private handleUp = (event: PointerEventLike): void => {
+    if (this.handleGestureEnd(event.pointerId)) return
+    if (this.consumed.has(event.pointerId)) {
+      this.releaseCapture(event.pointerId)
+      this.consumed.delete(event.pointerId)
+      return
+    }
     this.finishStroke(event, 'up')
   }
 
   private handleCancel = (event: PointerEventLike): void => {
+    if (this.handleGestureEnd(event.pointerId)) return
+    if (this.consumed.has(event.pointerId)) {
+      this.releaseCapture(event.pointerId)
+      this.consumed.delete(event.pointerId)
+      return
+    }
     this.finishStroke(event, 'cancel')
+  }
+
+  /**
+   * Một trong hai pointer của gesture nhấc lên: phát 'end', kết
+   * thúc gesture; pointer còn lại bị đánh dấu đã tiêu thụ (sự
+   * kiện của nó bị nuốt tới khi nhấc hẳn). Trả về true nếu sự
+   * kiện thuộc về gesture.
+   */
+  private handleGestureEnd(pointerId: number): boolean {
+    const gesture = this.gesture
+    if (gesture === null) return false
+    if (pointerId !== gesture.firstId && pointerId !== gesture.secondId) {
+      return true // pointer lạ trong lúc gesture: nuốt luôn
+    }
+    const survivor = pointerId === gesture.firstId ? gesture.secondId : gesture.firstId
+    this.gesture = null
+    this.currentPointerId = null
+    this.activeKind = null
+    this.activeScreen = null
+    this.activeClient = null
+    this.consumed.add(survivor)
+    this.releaseCapture(pointerId)
+    if (this.onGesture !== undefined) {
+      this.onGesture({
+        phase: 'end',
+        midpoint: gesture.lastMidpoint,
+        distance: gesture.lastDistance,
+        midpointClient: gesture.lastMidpointClient,
+        previousMidpoint: gesture.lastMidpoint,
+        previousDistance: gesture.lastDistance,
+        previousMidpointClient: gesture.lastMidpointClient,
+      })
+    }
+    return true
   }
 
   private finishStroke(event: PointerEventLike, type: 'up' | 'cancel'): void {
@@ -328,6 +566,9 @@ export class PointerInputManager {
     } finally {
       this.releaseCapture(pointerId)
       this.currentPointerId = null
+      this.activeKind = null
+      this.activeScreen = null
+      this.activeClient = null
     }
   }
 }

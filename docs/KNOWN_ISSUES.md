@@ -136,8 +136,14 @@ Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RE
 - **Tiến triển TASK-14A (2026-11-01):** tự cuộn khi viết đã triển
   khai ở tầng engine + gắn vào PDF Viewer và Whiteboard; kiểm chứng
   Chromium headless đạt (cuộn + nối nét khi giữ pointer ở mép).
-  Gesture đa điểm thuộc TASK-14B. Phần thiết bị thật của issue
-  (stylus/pressure/Safari) vẫn chưa kiểm chứng được.
+  Gesture đa điểm thuộc TASK-14B.
+- **Tiến triển TASK-14B (2026-11-01):** gesture hai ngón đã triển
+  khai (pinch pan/zoom + hủy nét khi ngón thứ hai chạm, chốt an
+  toàn lòng bàn tay ở tầng input); kiểm chứng bằng CDP touch trên
+  Chromium headless đạt 9/9 (pinch bảng trắng trực tiếp, PDF pan
+  trực tiếp + zoom chốt khi nhấc tay). Phần thiết bị thật của
+  issue (stylus/pressure/Safari, cảm giác palm rejection trên
+  phần cứng) vẫn chưa kiểm chứng được.
 - **Trạng thái:** OPEN (2026-10-30; cập nhật tiến triển 2026-11-01)
 
 ## ISSUE-007 — Phạm vi "sửa nội dung PDF gốc" chưa xác định

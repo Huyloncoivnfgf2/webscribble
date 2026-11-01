@@ -17,7 +17,7 @@ import type {
   AnnotationSurfaceSession,
 } from '../../../engines/annotation/index'
 import { DrawingEngine } from '../../../engines/drawing/index'
-import type { CanvasLike, PointerTargetLike } from '../../../engines/drawing/index'
+import type { CanvasLike, PinchGestureEvent, PointerTargetLike } from '../../../engines/drawing/index'
 import {
   getPdfPageGeometry,
   openPdfDocument,
@@ -52,8 +52,17 @@ export interface PdfViewerDeps {
 export interface PdfViewerElements {
   pdfCanvas: HTMLCanvasElement
   annotationCanvas: HTMLCanvasElement
-  /** Vùng hiển thị dùng để tính fit; chỉ cần kích thước client. */
-  container: { clientWidth: number; clientHeight: number }
+  /**
+   * Vùng hiển thị: tính fit theo kích thước client; pinch
+   * (TASK-14B) cần thêm scroll + rect để pan và neo zoom.
+   */
+  container: {
+    clientWidth: number
+    clientHeight: number
+    scrollLeft: number
+    scrollTop: number
+    getBoundingClientRect(): { left: number; top: number }
+  }
 }
 
 export type PdfViewerStatus = 'idle' | 'loading' | 'ready' | 'error'
@@ -121,6 +130,14 @@ function loadErrorMessage(error: unknown): { kind: string | null; message: strin
 export class PdfViewerController {
   private readonly deps: PdfViewerDeps
   private elements: PdfViewerElements | null = null
+  /** Trạng thái gesture pinch đang chạy (TASK-14B); null khi không có gesture. */
+  private pinch: {
+    startScale: number
+    startDistance: number
+    /** Điểm world (tọa độ trang chưa scale) nằm dưới trung điểm lúc bắt đầu. */
+    anchorWorld: { x: number; y: number }
+    lastFactor: number
+  } | null = null
   private readonly listeners = new Set<() => void>()
   private state: PdfViewerSnapshot = { ...IDLE_SNAPSHOT }
   private queue: Promise<unknown> = Promise.resolve()
@@ -354,6 +371,7 @@ export class PdfViewerController {
         element: elements.annotationCanvas as unknown as PointerTargetLike & CanvasLike,
         getCamera: () => ({ x: 0, y: 0, zoom: this.state.scale }),
         tool: this.state.tool,
+        onPinchGesture: (event) => this.handlePinchGesture(event),
         ...(this.deps.requestFrame ? { requestFrame: this.deps.requestFrame } : {}),
         ...(this.deps.cancelFrame ? { cancelFrame: this.deps.cancelFrame } : {}),
       })
@@ -402,6 +420,78 @@ export class PdfViewerController {
       this.drawingEngine.resize(result.cssWidth, result.cssHeight)
       this.setState({ pageCssWidth: result.cssWidth, pageCssHeight: result.cssHeight })
     })
+  }
+
+  // ── Pinch hai ngón (TASK-14B) ─────────────────────────────
+  // Pan áp trực tiếp theo từng 'update' (chỉ là scroll DOM).
+  // Zoom CHỐT ở 'end': trang PDF dựng lại một lần tại scale mới
+  // rồi neo điểm world dưới trung điểm cuối — dựng lại theo
+  // từng update tốn ~260ms/trang (đo ở TASK-06) nên không khả
+  // thi; đây là đánh đổi đã ghi trong kế hoạch TASK-14B.
+
+  private handlePinchGesture(event: PinchGestureEvent): void {
+    const elements = this.elements
+    if (elements === null) return
+    if (event.phase === 'start') {
+      const scale = this.state.scale
+      this.pinch = {
+        startScale: scale,
+        startDistance: event.distance,
+        anchorWorld: {
+          x: event.midpoint.x / scale,
+          y: event.midpoint.y / scale,
+        },
+        lastFactor: 1,
+      }
+      return
+    }
+    if (event.phase === 'update') {
+      if (this.pinch === null) return
+      // Pan: nội dung đi theo ngón tay — dùng hiệu tọa độ
+      // CLIENT (không bị nhiễu bởi chính scroll vừa áp).
+      const dx = event.midpointClient.x - event.previousMidpointClient.x
+      const dy = event.midpointClient.y - event.previousMidpointClient.y
+      if (dx !== 0) elements.container.scrollLeft -= dx
+      if (dy !== 0) elements.container.scrollTop -= dy
+      if (event.distance > 0 && this.pinch.startDistance > 0) {
+        this.pinch.lastFactor = event.distance / this.pinch.startDistance
+      }
+      return
+    }
+    // phase === 'end'
+    const pinch = this.pinch
+    this.pinch = null
+    if (pinch === null) return
+    const factor = pinch.lastFactor
+    if (!(factor > 0) || factor === 1) return
+    const nextScale = clampScale(pinch.startScale * factor)
+    if (nextScale === this.state.scale) return
+    const endClient = event.midpointClient
+    void this.setScale(nextScale).then(() => {
+      this.scrollWorldPointToClient(pinch.anchorWorld, endClient)
+    })
+  }
+
+  /**
+   * Đặt scroll sao cho điểm world (tọa độ trang chưa scale)
+   * nằm đúng dưới một điểm client cho trước, tại scale hiện
+   * tại. Đọc rect SAU khi layout đã đổi (hàm được gọi sau khi
+   * setScale hoàn tất) nên số đo luôn theo bố cục mới.
+   */
+  private scrollWorldPointToClient(
+    world: { x: number; y: number },
+    clientPoint: { x: number; y: number },
+  ): void {
+    const elements = this.elements
+    if (elements === null) return
+    const container = elements.container
+    const containerRect = container.getBoundingClientRect()
+    const canvasRect = elements.annotationCanvas.getBoundingClientRect()
+    const originX = canvasRect.left - containerRect.left + container.scrollLeft
+    const originY = canvasRect.top - containerRect.top + container.scrollTop
+    const scale = this.state.scale
+    container.scrollLeft = originX + world.x * scale - (clientPoint.x - containerRect.left)
+    container.scrollTop = originY + world.y * scale - (clientPoint.y - containerRect.top)
   }
 
   zoomIn(): Promise<void> {

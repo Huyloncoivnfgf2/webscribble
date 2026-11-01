@@ -545,3 +545,15 @@ Xem KNOWN_ISSUES.md. Tóm tắt sau TASK-02:
   (scrollTop tăng dần khi giữ bút ở mép, nét nối dài thật, tẩy không
   cuộn). Chưa kiểm chứng: bút/stylus thật và Safari (ISSUE-006).
   Kế tiếp: TASK-14B (gesture hai ngón) theo brief.
+
+- **TASK-14B — Gesture hai ngón pan/zoom: DONE ngày 2026-11-01.**
+  Input Manager theo dõi pointer thứ hai (chỉ kích hoạt khi cả hai
+  là touch — chốt an toàn lòng bàn tay cho stylus), phát sự kiện
+  pinch start/update/end; DrawingEngine hủy thao tác đang tạo dở
+  ngay khi gesture bắt đầu (`abandonInProgress`) và chuyển tiếp
+  qua `onPinchGesture`; `pinchCamera` thuần ở coordinates.
+  Whiteboard pinch trực tiếp (scale + neo scroll); PDF pan trực
+  tiếp + zoom chốt khi nhấc tay tại điểm neo. **621/621 test
+  (58 file)**, lint 0 lỗi, build đạt; Browser QA CDP touch 9/9.
+  Chưa kiểm chứng thiết bị thật/Safari (ISSUE-006). Kế tiếp:
+  TASK-14C (nền dùng chung) theo brief.

@@ -50,7 +50,7 @@ import {
   SurfaceChangeCommand,
   type IndexedObject,
 } from './history'
-import { PointerInputManager, type PointerInputEvent, type PointerTargetLike } from './input'
+import { PointerInputManager, type PinchGestureEvent, type PointerInputEvent, type PointerTargetLike } from './input'
 import {
   drawLassoPreview,
   drawSelectedBounds,
@@ -112,6 +112,13 @@ export interface DrawingEngineOptions {
    * mở trình sửa text tại vị trí world này, rồi gọi `addTextObject`.
    */
   onTextPlacementRequested?: (position: Point) => void
+  /**
+   * Nhận sự kiện gesture hai ngón (TASK-14B) để tầng view áp
+   * pan/zoom theo cách của nó (đổi scale + cuộn khung). Engine tự
+   * HỦY thao tác đang tạo dở (abandonInProgress) ngay khi gesture
+   * bắt đầu — trước cả khi chuyển tiếp sự kiện 'start' này.
+   */
+  onPinchGesture?: (event: PinchGestureEvent) => void
   requestFrame?: FrameRequester
   cancelFrame?: FrameCanceller
   getDevicePixelRatio?: () => number
@@ -126,6 +133,7 @@ export class DrawingEngine {
   private readonly inputManager: PointerInputManager
   private readonly injectedTextMeasurer: TextMeasurer | undefined
   private readonly onTextPlacementRequested: ((position: Point) => void) | undefined
+  private readonly onPinchGesture: ((event: PinchGestureEvent) => void) | undefined
   private canvasTextMeasurer: TextMeasurer | null = null
 
   private activeSession: ToolSession
@@ -151,6 +159,7 @@ export class DrawingEngine {
     this.currentEraserSize = options.eraserSize ?? DEFAULT_ERASER_SIZE
     this.injectedTextMeasurer = options.textMeasurer
     this.onTextPlacementRequested = options.onTextPlacementRequested
+    this.onPinchGesture = options.onPinchGesture
     this.activeSession = this.createSession()
     this.renderer = new CanvasRenderer({
       canvas: options.element,
@@ -173,6 +182,15 @@ export class DrawingEngine {
       target: options.element,
       getCamera: options.getCamera,
       onEvent: (event) => this.handleInputEvent(event),
+      onGesture: (event) => {
+        // Ngón thứ hai chạm xuống = người dùng đổi ý định sang
+        // pan/zoom: hủy thao tác đang tạo dở TRƯỚC khi tầng view
+        // nhận sự kiện, để không object nào kịp hình thành.
+        if (event.phase === 'start') {
+          this.abandonInProgress()
+        }
+        this.onPinchGesture?.(event)
+      },
     })
   }
 
@@ -194,6 +212,29 @@ export class DrawingEngine {
   /** Đường kính vùng tẩy hiện tại (world units). */
   get eraserSize(): number {
     return this.currentEraserSize
+  }
+
+  /**
+   * HỦY thao tác đang tạo dở mà KHÔNG tạo object và KHÔNG ghi
+   * history (TASK-14B) — ngược với chính sách chốt-khi-đổi-tool
+   * của detach/setTool: đường này chỉ dùng khi người dùng chuyển
+   * sang gesture hai ngón giữa chừng. Nét/hình đang vẽ -> abandon;
+   * vùng chọn đang kéo -> bỏ (kết quả chọn cũ giữ nguyên); một
+   * lần tẩy đang dở -> phần đã tẩy là thay đổi thật trên Surface
+   * nên được chốt thành MỘT history command như khi nhấc tay.
+   */
+  abandonInProgress(): void {
+    const session = this.activeSession
+    if (session instanceof StrokeBuilder || session instanceof ShapeBuilder) {
+      session.abandon()
+    } else if (
+      session instanceof RectSelectionBuilder ||
+      session instanceof LassoSelectionBuilder
+    ) {
+      this.activeSession = this.createSession()
+    }
+    this.finishEraserGesture()
+    this.renderer.requestRender()
   }
 
   /** Đổi kích thước vùng tẩy; áp dụng ngay cho phiên tẩy đang mở. */
