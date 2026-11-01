@@ -89,7 +89,7 @@ toàn bộ lịch sử hội thoại.
 
 ## 5. Phiên bản tài liệu
 
-- **Docs version:** 1.35
+- **Docs version:** 1.36
 - **Phiên bản sản phẩm:** **v1.0.0 — MVP Complete** (phát hành 2026-10-31)
-- **Ngày cập nhật:** 2026-10-31
+- **Ngày cập nhật:** 2026-11-01
 - **Task tạo:** TASK-00

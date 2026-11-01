@@ -16,6 +16,11 @@ import {
   ZoomOut,
 } from 'lucide-react'
 import { getAppStorage } from '../../storage'
+import {
+  attachAutoScroll,
+  dispatchAutoScrollMove,
+  shouldAutoScrollForTool,
+} from '../../../engines/drawing/autoScroll'
 import { PdfViewerController, type PdfViewerSnapshot } from './PdfViewerController'
 import { PdfExportDialog } from './PdfExportDialog'
 import type { ViewerTool } from './pdfViewerState'
@@ -66,9 +71,19 @@ export function PdfViewer({ documentId, onBack }: PdfViewerProps) {
     const container = containerRef.current
     const pdfCanvas = pdfCanvasRef.current
     const annoCanvas = annoCanvasRef.current
+    let detachAutoScroll: (() => void) | null = null
     if (container !== null && pdfCanvas !== null && annoCanvas !== null) {
       controller.bindElements({ pdfCanvas, annotationCanvas: annoCanvas, container })
       void controller.openDocument(documentId)
+      // TASK-14A: tự cuộn khi vẽ gần mép dưới/phải của khung trang.
+      detachAutoScroll = attachAutoScroll({
+        target: annoCanvas,
+        container,
+        isEnabled: () => shouldAutoScrollForTool(controller.getSnapshot().tool),
+        onScrolled: (info) => {
+          dispatchAutoScrollMove(annoCanvas, info)
+        },
+      })
     }
     const observer =
       container !== null && typeof ResizeObserver !== 'undefined'
@@ -76,6 +91,7 @@ export function PdfViewer({ documentId, onBack }: PdfViewerProps) {
         : null
     if (observer !== null && container !== null) observer.observe(container)
     return () => {
+      detachAutoScroll?.()
       observer?.disconnect()
       unsubscribe()
       controller.dispose()

@@ -533,3 +533,15 @@ Xem KNOWN_ISSUES.md. Tóm tắt sau TASK-02:
   dùng start_url/scope/icon tương đối, SW lấy
   index theo scope của chính nó, đăng ký SW theo
   BASE_URL. ISSUE-008 RESOLVED.
+
+- **TASK-14A — Tự cuộn khi viết: DONE ngày 2026-11-01** (đợt nâng cấp
+  TASK-14 do chủ dự án giao). `src/engines/drawing/autoScroll.ts` mới:
+  hàm thuần tính vận tốc cuộn (mép dưới/phải, vùng đệm 48px, tối đa
+  600px/giây) + controller vòng rAF + attach có cổng công cụ (chỉ
+  pen/highlighter) + pointermove tổng hợp nối dài nét khi con trỏ đứng
+  yên. Gắn vào PdfViewer và WhiteboardView (gồm bản nhúng Split);
+  không sửa engine/input/tọa độ. **610/610 test (57 file)**, lint 0
+  lỗi, build đạt; Browser QA production 10/10 trên Chromium headless
+  (scrollTop tăng dần khi giữ bút ở mép, nét nối dài thật, tẩy không
+  cuộn). Chưa kiểm chứng: bút/stylus thật và Safari (ISSUE-006).
+  Kế tiếp: TASK-14B (gesture hai ngón) theo brief.

@@ -5,6 +5,32 @@
 
 ## Lịch sử
 
+### TASK-14A — 2026-11-01 — Tự cuộn khi viết (docs v1.36)
+
+- **File mới:** `src/engines/drawing/autoScroll.ts`
+  — hàm thuần `computeAutoScrollVelocity` (chỉ
+  mép dưới/phải, vùng đệm 48px, tốc độ tỉ lệ tuyến
+  tính tới tối đa 600px/giây), `AutoScrollController`
+  (vòng rAF, dt kẹp 0,1s), `attachAutoScroll` (cổng
+  công cụ: chỉ pen/highlighter), `dispatchAutoScrollMove`
+  (pointermove tổng hợp để nét nối dài khi con trỏ
+  đứng yên lúc cuộn). Export qua `drawing/index.ts`.
+- **Sửa:** `PdfViewer.tsx` và `WhiteboardView.tsx`
+  gắn attachAutoScroll lên canvas vẽ + khung cuộn
+  sẵn có; không sửa engine/input/tọa độ (Input
+  Manager đọc lại rect mỗi sự kiện nên điểm vẽ tự
+  khớp sau cuộn). Pane PDF của Split chưa áp dụng
+  (ngoài phạm vi bước này).
+- **Kiểm chứng:** 22 test mới (`tests/drawing/
+  autoScroll.test.ts`): **610/610 test (57 file)**,
+  lint 0 lỗi, build đạt. Browser QA production
+  (Chromium headless) **10/10**: giữ bút ở mép dưới
+  → scrollTop tăng dần tới giới hạn cuộn, mực nét
+  tăng (nét nối dài thật), tẩy ở mép không cuộn,
+  PDF cùng hành vi, 0 lỗi console. Cảm giác với
+  bút/stylus thật + Safari vẫn thuộc ISSUE-006
+  (cần thiết bị thật).
+
 ### Triển khai — 2026-10-31 — GitHub Pages (HTTPS)
 
 - WebScribble v1.0.0 chạy chính thức tại

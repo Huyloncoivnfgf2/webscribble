@@ -133,7 +133,12 @@ Trạng thái: `OPEN` (đang mở) · `INVESTIGATING` (đang khảo sát) · `RE
   xóa sau khi đo). Phần còn lại — bút stylus thật, Safari/iPadOS và
   thiết bị cảm ứng thật — vẫn chưa kiểm chứng được trong môi trường
   hiện tại.
-- **Trạng thái:** OPEN (2026-10-30; cập nhật tiến triển 2026-10-31)
+- **Tiến triển TASK-14A (2026-11-01):** tự cuộn khi viết đã triển
+  khai ở tầng engine + gắn vào PDF Viewer và Whiteboard; kiểm chứng
+  Chromium headless đạt (cuộn + nối nét khi giữ pointer ở mép).
+  Gesture đa điểm thuộc TASK-14B. Phần thiết bị thật của issue
+  (stylus/pressure/Safari) vẫn chưa kiểm chứng được.
+- **Trạng thái:** OPEN (2026-10-30; cập nhật tiến triển 2026-11-01)
 
 ## ISSUE-007 — Phạm vi "sửa nội dung PDF gốc" chưa xác định
 - **Loại:** Quyết định còn thiếu.

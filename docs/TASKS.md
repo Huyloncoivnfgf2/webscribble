@@ -586,3 +586,17 @@
 - **Tiêu chí nghiệm thu:** Mở một tài liệu ở vùng 1 và viết ở cả hai vùng;
   chỉnh tỷ lệ hoạt động trên desktop và tablet; đóng/mở lại workspace không
   mất dữ liệu ở vùng nào.
+
+## TASK-14 — Nâng cấp viết tay & chú thích (đợt Scrble-level)
+
+- **Mục tiêu:** Bốn pha do chủ dự án giao ngày 2026-11-01: (14A) tự cuộn
+  khi viết trên PDF và whiteboard; (14B) gesture hai ngón pan/zoom;
+  (14C) nhiều kiểu nền dùng chung cho PDF/DOCX/giấy trắng, lưu theo tài
+  liệu trong IndexedDB (migration bảo toàn dữ liệu cũ nếu đổi schema);
+  (14D) nhiều kiểu bút (chì/bi/dạ/mảnh/dày/màu nước) + preset bút, tương
+  thích ngược dữ liệu nét cũ. Ngoài phạm vi: nhận dạng hình khối tự
+  động; OCR chữ viết tay.
+- **Phụ thuộc:** Drawing Engine (TASK-05), PDF Viewer (TASK-06),
+  Whiteboard (TASK-12). Mốc nền bắt buộc giữ: 588/588 test trước đợt.
+- **Trạng thái:** 14A DONE (2026-11-01) — xem CHANGELOG. 14B–14D chưa
+  bắt đầu, chờ triển khai theo thứ tự.

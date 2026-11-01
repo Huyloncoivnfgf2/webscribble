@@ -21,6 +21,11 @@ import {
 } from 'lucide-react'
 import { getAppStorage } from '../../storage'
 import {
+  attachAutoScroll,
+  dispatchAutoScrollMove,
+  shouldAutoScrollForTool,
+} from '../../../engines/drawing/autoScroll'
+import {
   WB_HIGHLIGHT_COLORS,
   WB_PEN_COLORS,
   WhiteboardController,
@@ -166,6 +171,19 @@ export function WhiteboardView({
     if (canvas === null) return
     void controller.open(documentId, canvas)
     const scroll = scrollRef.current
+    // TASK-14A: tự cuộn khi vẽ gần mép dưới/phải của khung bảng.
+    const detachAutoScroll =
+      scroll !== null
+        ? attachAutoScroll({
+            target: canvas,
+            container: scroll,
+            isEnabled: () =>
+              shouldAutoScrollForTool(controller.getSnapshot().tool),
+            onScrolled: (info) => {
+              dispatchAutoScrollMove(canvas, info)
+            },
+          })
+        : null
     const observer =
       scroll !== null
         ? new ResizeObserver(() => {
@@ -185,6 +203,7 @@ export function WhiteboardView({
         : null
     if (frame !== null && frameObserver !== null) frameObserver.observe(frame)
     return () => {
+      detachAutoScroll?.()
       observer?.disconnect()
       frameObserver?.disconnect()
       void controller.flush().catch(() => undefined)
