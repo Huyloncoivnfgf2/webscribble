@@ -5,6 +5,37 @@
 
 ## Lịch sử
 
+### TASK-14D — 2026-11-01 — Nhiều kiểu bút + preset bút (docs v1.39) — ĐỢT TASK-14 HOÀN THÀNH
+
+- **DEC-036** (xem DECISIONS): hồ sơ bút duy nhất
+  `STROKE_PROFILES` trong Drawing Engine — 8 loại nét
+  (pen, highlighter + chì, bi, dạ, nét mảnh, nét dày,
+  màu nước), cảm giác suy ra lúc vẽ từ `type`, dữ
+  liệu đã lưu không đổi; pen/highlighter khóa outline
+  bằng test so điểm tuyệt đối với tham số gốc.
+- **Engine:** `StrokeKind`/`FreehandStrokeObject`
+  thay hai interface riêng; factory chung
+  `createStrokeOfKind`; validation nhận 8 loại; bounds
+  theo cỡ hiệu dụng nhất quán (factory/geometry/tẩy/
+  chọn vùng); tẩy đoạn giữ nguyên loại bút của đoạn
+  còn lại; tự cuộn 14A mở cho mọi loại bút; xuất PDF
+  vector nhân hệ số mờ của hồ sơ.
+- **Preset:** `PenPresetStore` ở localStorage (tối đa
+  12, 3 mẫu lần đầu) + `PenPresetBar`/`PenKindSelect`
+  dùng chung: whiteboard, thanh chú thích DOCX, thanh
+  công cụ chung Split (pane PDF chỉ nhận loại bút);
+  PDF thêm 6 nút loại bút trên thanh công cụ, màu/cỡ
+  mặc định theo hồ sơ.
+- **Kiểm chứng:** **660/660 test (61 file)** — 21 test
+  mới (khóa outline cũ, từng loại bút đo được khác
+  biệt, màu nước 3 lớp, tẩy giữ loại, preset
+  lưu/đọc/giới hạn/lọc hỏng); lint 0 lỗi; build đạt;
+  Browser QA production **12/12** (vẽ chì/màu nước,
+  lưu preset -> áp lại đúng loại + màu xanh, reload
+  giữ nét + preset, PDF vẽ màu nước bằng màu mặc
+  định hồ sơ). Cảm giác bút thật/stylus/Safari vẫn
+  thuộc ISSUE-006.
+
 ### TASK-14C — 2026-11-01 — Nền giấy dùng chung cho whiteboard/PDF/DOCX (docs v1.38)
 
 - **DEC-035** (xem DECISIONS): mô hình `PaperBackground`

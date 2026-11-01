@@ -1,4 +1,5 @@
 import type { ViewerTool } from '../documents/pdfViewerState'
+import type { PenPreset } from '../pens/penPresets'
 import type { PdfViewerController } from '../documents/PdfViewerController'
 import type { DocxAnnotationController } from '../documents/DocxAnnotationController'
 import type { WhiteboardController } from '../whiteboard/WhiteboardController'
@@ -41,6 +42,8 @@ export interface DrawingPaneAdapter {
   readonly capabilities: { color: boolean; size: boolean }
   getToolState(): PaneToolState
   setTool(tool: ViewerTool): void
+  /** Áp preset bút (TASK-14D); pane PDF chỉ nhận loại bút. */
+  applyPreset(preset: PenPreset): void
   setColor(color: string): void
   setSizeLabel(sizeLabel: 'S' | 'M' | 'L'): void
   undo(): void
@@ -70,6 +73,7 @@ export function whiteboardPaneAdapter(controller: WhiteboardController): Drawing
       }
     },
     setTool: (tool) => controller.setTool(tool),
+    applyPreset: (preset) => controller.applyPreset(preset),
     setColor: (color) => controller.setColor(color),
     setSizeLabel: (label) => controller.setSizeLabel(label),
     undo: () => controller.undo(),
@@ -86,6 +90,7 @@ export function pdfPaneAdapter(controller: PdfViewerController): DrawingPaneAdap
       return { ...FALLBACK_TOOL_STATE, tool: s.tool, canUndo: s.canUndo, canRedo: s.canRedo }
     },
     setTool: (tool) => controller.setTool(tool),
+    applyPreset: (preset) => controller.setTool(preset.kind),
     setColor: () => undefined,
     setSizeLabel: () => undefined,
     undo: () => controller.undo(),
@@ -122,6 +127,12 @@ export function docxPaneAdapter(
       if (controller === undefined) return
       controller.setMode('annotate')
       controller.setTool(tool)
+    },
+    applyPreset: (preset) => {
+      const controller = resolve()
+      if (controller === undefined) return
+      controller.setMode('annotate')
+      controller.applyPreset(preset)
     },
     setColor: (color) => resolve()?.setColor(color),
     setSizeLabel: (label) => resolve()?.setSizeLabel(label),
@@ -233,6 +244,10 @@ export class SplitController {
 
   setTool(tool: ViewerTool): void {
     this.activeAdapter()?.setTool(tool)
+  }
+
+  applyPreset(preset: PenPreset): void {
+    this.activeAdapter()?.applyPreset(preset)
   }
 
   setColor(color: string): void {

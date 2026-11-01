@@ -1,4 +1,5 @@
 export * from './types'
+export * from './strokeProfiles'
 export * from './geometry'
 export * from './coordinates'
 export * from './objects'

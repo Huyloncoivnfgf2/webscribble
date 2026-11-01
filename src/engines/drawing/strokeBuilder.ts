@@ -25,16 +25,12 @@
  */
 
 import { expandBounds } from './geometry'
-import {
-  createHighlighterStroke,
-  createObjectId,
-  createPenStroke,
-  DEFAULT_HIGHLIGHTER_STYLE,
-  DEFAULT_PEN_STYLE,
-} from './objects'
+import { createObjectId, createStrokeOfKind } from './objects'
+import { STROKE_PROFILES } from './strokeProfiles'
 import type {
   Bounds,
   ObjectId,
+  StrokeKind,
   StrokeObject,
   StrokePoint,
   StrokeStyle,
@@ -42,7 +38,8 @@ import type {
 } from './types'
 import type { PointerInputEvent, PointerSample } from './input'
 
-export type StrokeTool = 'pen' | 'highlighter'
+/** Công cụ nét tự do = mọi loại bút (TASK-14D mở rộng từ pen/highlighter). */
+export type StrokeTool = StrokeKind
 
 /** Lý do một nét kết thúc. */
 export type StrokeEndReason = 'up' | 'cancel' | 'interrupted'
@@ -252,14 +249,12 @@ export class StrokeBuilder {
       points: input.points,
       style: this.style,
     }
-    return this.tool === 'pen'
-      ? createPenStroke(factoryInput)
-      : createHighlighterStroke(factoryInput)
+    return createStrokeOfKind(this.tool, factoryInput)
   }
 
   /** Style hiệu dụng (mặc định của công cụ trộn với style tùy chỉnh). */
   private resolvedStyle(): StrokeStyle {
-    const base = this.tool === 'pen' ? DEFAULT_PEN_STYLE : DEFAULT_HIGHLIGHTER_STYLE
+    const base = STROKE_PROFILES[this.tool].defaultStyle
     return { ...base, ...this.style }
   }
 

@@ -27,6 +27,7 @@
  */
 
 import type { Point } from './types'
+import { isStrokeKind } from './strokeProfiles'
 
 /** Hình chữ nhật hiển thị của khung cuộn (CSS px, tọa độ client). */
 export interface AutoScrollRect {
@@ -281,7 +282,7 @@ export class AutoScrollController {
  * hình khối, chữ — không cuộn (đúng phạm vi TASK-14A).
  */
 export function shouldAutoScrollForTool(tool: string): boolean {
-  return tool === 'pen' || tool === 'highlighter'
+  return isStrokeKind(tool)
 }
 
 /** Phần tối thiểu của sự kiện pointer mà attach cần đọc. */

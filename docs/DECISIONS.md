@@ -660,6 +660,43 @@
 
 ---
 
+### DEC-036 — Kiểu bút là hồ sơ render suy ra từ `type`; preset bút là sở thích thiết bị (TASK-14D)
+
+- **Bối cảnh:** TASK-14D cần thêm sáu loại bút (chì, bi,
+  dạ, nét mảnh, nét dày, màu nước) cạnh pen/highlighter
+  mà KHÔNG đổi dữ liệu nét đã lưu (điểm thô + style) và
+  nét cũ phải hiển thị y hệt như trước.
+- **Quyết định:**
+  1. Một bảng hồ sơ duy nhất `STROKE_PROFILES` trong
+     Drawing Engine ánh xạ mỗi `StrokeKind` (8 loại) tới
+     tham số perfect-freehand (thinning/smoothing/
+     streamline/simulatePressure), hệ số cỡ, hệ số mờ,
+     số lớp tô, style mặc định và bảng cỡ S/M/L dùng
+     chung mọi controller. Cảm giác bút suy ra LÚC VẼ
+     từ `type` của object — dữ liệu không thêm trường.
+  2. pen/highlighter giữ NGUYÊN tham số TASK-05
+     (pen thinning 0.5, highlighter thinning 0, hệ số
+     1, một lớp) — có test khóa: outline của hai loại
+     này phải bằng điểm tuyệt đối outline tính bằng
+     tham số gốc gọi trực tiếp perfect-freehand.
+  3. Bounds của nét tính theo cỡ HIỆU DỤNG (size × hệ
+     số cỡ) nhất quán ở factory, `computeObjectBounds`,
+     tẩy (bán kính hiệu dụng + đoạn còn lại sau tẩy
+     đoạn giữ nguyên loại bút) và chọn vùng.
+  4. Màu nước = tô chồng 3 lớp alpha thấp (vùng chồng
+     đậm dần). Xuất PDF: bản raster hưởng cùng renderer;
+     bản vector nhân hệ số mờ vào opacity của một lớp
+     (xấp xỉ đã ghi nhận, không phải tương đương tuyệt
+     đối với bản chồng lớp).
+  5. Preset bút (loại + màu + cỡ S/M/L, tối đa 12) là
+     SỞ THÍCH THIẾT BỊ: lưu localStorage khóa
+     `webscribble:pen-presets:v1`, gieo 3 preset mẫu
+     lần đầu; KHÔNG thuộc dữ liệu thư viện, không vào
+     backup (cùng khuôn vết phiên Split, DEC-032).
+- **Ngày:** 2026-11-01 · **Trạng thái:** ACTIVE
+
+---
+
 ## Đề xuất chờ xác nhận — CHƯA PHẢI QUYẾT ĐỊNH
 
 > Các mục dưới đây do trợ lý đề xuất trong quá trình triển khai, **chưa

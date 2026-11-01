@@ -1,7 +1,9 @@
 import { arrowBounds, shapeObjectBounds, strokeBounds, textBounds } from './geometry'
+import { STROKE_PROFILES } from './strokeProfiles'
 import type {
   ArrowObject,
   EllipseObject,
+  FreehandStrokeObject,
   HighlighterStrokeObject,
   LineObject,
   ObjectId,
@@ -9,6 +11,7 @@ import type {
   Point,
   RectangleObject,
   ShapeStyle,
+  StrokeKind,
   StrokePoint,
   StrokeStyle,
   SurfaceId,
@@ -33,16 +36,11 @@ export function createObjectId(): ObjectId {
   return `obj-${Date.now().toString(36)}-${fallbackCounter.toString(36)}-${random}`
 }
 
-export const DEFAULT_PEN_STYLE: StrokeStyle = {
-  color: '#111827',
-  size: 3,
-  opacity: 1,
-}
+/** Mặc định của pen/highlighter — lấy từ hồ sơ bút (TASK-14D) cho khỏi lệch. */
+export const DEFAULT_PEN_STYLE: StrokeStyle = { ...STROKE_PROFILES.pen.defaultStyle }
 
 export const DEFAULT_HIGHLIGHTER_STYLE: StrokeStyle = {
-  color: '#fde047',
-  size: 14,
-  opacity: 0.4,
+  ...STROKE_PROFILES.highlighter.defaultStyle,
 }
 
 export const DEFAULT_SHAPE_STYLE: ShapeStyle = {
@@ -92,28 +90,34 @@ export interface CreateStrokeInput extends BaseInput {
   style?: Partial<StrokeStyle>
 }
 
-export function createPenStroke(input: CreateStrokeInput): PenStrokeObject {
-  requirePoints(input.points, 'createPenStroke')
-  const style: StrokeStyle = { ...DEFAULT_PEN_STYLE, ...input.style }
+/**
+ * Factory chung cho MỌI loại nét tự do (TASK-14D): mặc
+ * định lấy từ hồ sơ của loại bút; bounds dùng cỡ HIỆU
+ * DỤNG (size × hệ số cỡ của hồ sơ) để vùng chọn/tẩy bao
+ * đúng nét nhìn thấy.
+ */
+export function createStrokeOfKind(
+  kind: StrokeKind,
+  input: CreateStrokeInput,
+): FreehandStrokeObject {
+  requirePoints(input.points, 'createStrokeOfKind')
+  const profile = STROKE_PROFILES[kind]
+  const style: StrokeStyle = { ...profile.defaultStyle, ...input.style }
   return {
     ...baseFields(input),
-    type: 'pen',
+    type: kind,
     points: input.points,
     style,
-    bounds: strokeBounds(input.points, style.size),
+    bounds: strokeBounds(input.points, style.size * profile.sizeScale),
   }
 }
 
+export function createPenStroke(input: CreateStrokeInput): PenStrokeObject {
+  return createStrokeOfKind('pen', input) as PenStrokeObject
+}
+
 export function createHighlighterStroke(input: CreateStrokeInput): HighlighterStrokeObject {
-  requirePoints(input.points, 'createHighlighterStroke')
-  const style: StrokeStyle = { ...DEFAULT_HIGHLIGHTER_STYLE, ...input.style }
-  return {
-    ...baseFields(input),
-    type: 'highlighter',
-    points: input.points,
-    style,
-    bounds: strokeBounds(input.points, style.size),
-  }
+  return createStrokeOfKind('highlighter', input) as HighlighterStrokeObject
 }
 
 export interface CreateShapeInput extends BaseInput {

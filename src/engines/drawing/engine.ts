@@ -61,6 +61,7 @@ import {
 } from './selection'
 import { ShapeBuilder, type ShapeTool } from './shapeBuilder'
 import { StrokeBuilder, type StrokeTool } from './strokeBuilder'
+import { isStrokeKind } from './strokeProfiles'
 import {
   buildTextObject,
   createCanvasTextMeasurer,
@@ -289,7 +290,7 @@ export class DrawingEngine {
     this.finishEraserGesture()
     this.inputManager.reset()
     this.currentTool = tool
-    if (tool === 'pen' || tool === 'highlighter') {
+    if (isStrokeKind(tool)) {
       this.strokeStyle = style as Partial<StrokeStyle> | undefined
     } else if ((SHAPE_TOOLS as readonly string[]).includes(tool)) {
       this.shapeStyle = style as Partial<ShapeStyle> | undefined
@@ -428,16 +429,16 @@ export class DrawingEngine {
   }
 
   private createSession(): ToolSession {
+    if (isStrokeKind(this.currentTool)) {
+      return new StrokeBuilder({
+        surfaceId: this.surface.id,
+        tool: this.currentTool,
+        style: this.strokeStyle,
+      })
+    }
     switch (this.currentTool) {
       case 'text':
         return null
-      case 'pen':
-      case 'highlighter':
-        return new StrokeBuilder({
-          surfaceId: this.surface.id,
-          tool: this.currentTool,
-          style: this.strokeStyle,
-        })
       case 'line':
       case 'rectangle':
       case 'ellipse':
@@ -491,6 +492,18 @@ export class DrawingEngine {
         return 'Pen stroke'
       case 'highlighter':
         return 'Highlighter stroke'
+      case 'pencil':
+        return 'Pencil stroke'
+      case 'ballpoint':
+        return 'Ballpoint stroke'
+      case 'marker':
+        return 'Marker stroke'
+      case 'fine-pen':
+        return 'Fine pen stroke'
+      case 'thick-pen':
+        return 'Thick pen stroke'
+      case 'watercolor':
+        return 'Watercolor stroke'
       case 'line':
         return 'Line'
       case 'rectangle':

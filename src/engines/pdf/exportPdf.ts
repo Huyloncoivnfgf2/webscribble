@@ -11,7 +11,9 @@ import {
   arrowHeadLength,
   arrowHeadPoints,
   drawObject,
+  isStrokeObject,
   strokeOutlinePoints,
+  strokeProfile,
   type CanvasContextLike,
   type DrawingObject,
   type Point,
@@ -166,7 +168,10 @@ function drawStrokeVector(page: PDFPage, t: PageTransform, object: StrokeObject)
     x: t.cropX,
     y: t.cropY + t.cropHeight,
     color: hexToRgb(object.style.color),
-    opacity: object.style.opacity,
+    // Khớp độ mờ hiệu dụng của renderer (TASK-14D): vector
+    // chỉ vẽ MỘT lớp nên nhân hệ số hồ sơ vào opacity; riêng
+    // màu nước (nhiều lớp) bản vector là xấp xỉ một lớp.
+    opacity: object.style.opacity * strokeProfile(object.type).opacityScale,
   })
   return true
 }
@@ -366,7 +371,7 @@ export async function flattenPdfAnnotations(input: FlattenPdfInput): Promise<Fla
         } else {
           let drawnAny = false
           for (const object of objects) {
-            if (object.type === 'pen' || object.type === 'highlighter') {
+            if (isStrokeObject(object)) {
               drawnAny = drawStrokeVector(libPage, transform, object) || drawnAny
             } else if (object.type === 'text') {
               if (font !== null) {

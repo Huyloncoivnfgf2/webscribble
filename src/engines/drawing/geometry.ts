@@ -1,4 +1,5 @@
-import type { Bounds, DrawingObject, Point } from './types'
+import type { Bounds, DrawingObject, Point, StrokeObject } from './types'
+import { isStrokeKind, STROKE_PROFILES } from './strokeProfiles'
 
 /**
  * Tính bounds từ một tập điểm, nới rộng đều `padding` về mọi phía.
@@ -113,10 +114,16 @@ export function textBounds(position: Point, width: number, height: number): Boun
 
 /** Tính lại bounds chuẩn của một object từ dữ liệu riêng của nó. */
 export function computeObjectBounds(object: DrawingObject): Bounds {
+  // Nét tự do: bounds theo cỡ HIỆU DỤNG (size x hệ số hồ sơ,
+  // TASK-14D) — khớp bounds mà factory đã ghi khi tạo object:
+  if (isStrokeKind(object.type)) {
+    const stroke = object as StrokeObject
+    return strokeBounds(
+      stroke.points,
+      stroke.style.size * STROKE_PROFILES[stroke.type].sizeScale,
+    )
+  }
   switch (object.type) {
-    case 'pen':
-    case 'highlighter':
-      return strokeBounds(object.points, object.style.size)
     case 'line':
     case 'rectangle':
     case 'ellipse':

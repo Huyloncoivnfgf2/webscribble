@@ -570,3 +570,17 @@ Xem KNOWN_ISSUES.md. Tóm tắt sau TASK-02:
   (gồm ảnh giả bị từ chối, reload giữ nền, PDF nền dưới
   trang, DOCX bảng đen). Chưa kiểm chứng thiết bị thật/Safari
   (ISSUE-006). Kế tiếp: TASK-14D (kiểu bút + preset).
+
+- **TASK-14D — Nhiều kiểu bút + preset: DONE ngày 2026-11-01 —
+  ĐỢT TASK-14 HOÀN THÀNH (14A-14D).** DEC-036: hồ sơ bút
+  `STROKE_PROFILES` trong Drawing Engine, 8 loại nét (pen,
+  highlighter, chì, bi, dạ, nét mảnh, nét dày, màu nước),
+  cảm giác suy ra lúc vẽ từ `type` — dữ liệu nét cũ không
+  đổi, outline pen/highlighter khóa bằng test so điểm với
+  tham số gốc; màu nước tô chồng 3 lớp; preset bút (loại +
+  màu + cỡ, tối đa 12) là sở thích thiết bị ở localStorage,
+  không vào backup. **660/660 test (61 file)**, lint 0 lỗi,
+  build đạt; Browser QA production 12/12. Cả bốn commit
+  TASK-14A-D đang ở local, CHƯA push (web Pages trực tuyến
+  chưa có TASK-14). Chưa kiểm chứng: cảm giác bút/stylus
+  thật và Safari (ISSUE-006).

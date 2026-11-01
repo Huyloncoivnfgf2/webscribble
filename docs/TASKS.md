@@ -598,5 +598,5 @@
   động; OCR chữ viết tay.
 - **Phụ thuộc:** Drawing Engine (TASK-05), PDF Viewer (TASK-06),
   Whiteboard (TASK-12). Mốc nền bắt buộc giữ: 588/588 test trước đợt.
-- **Trạng thái:** 14A DONE, 14B DONE, 14C DONE (2026-11-01) — xem
-  CHANGELOG. Còn 14D (kiểu bút + preset), chờ triển khai.
+- **Trạng thái:** HOÀN THÀNH — 14A, 14B, 14C, 14D đều DONE
+  (2026-11-01) — xem CHANGELOG. Bốn commit ở local, chưa push.

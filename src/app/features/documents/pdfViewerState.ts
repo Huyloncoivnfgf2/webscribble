@@ -12,7 +12,10 @@ export const ZOOM_STEP = 1.25
 /** Khoảng đệm (CSS px) quanh trang khi fit. */
 export const FIT_PADDING = 24
 
-export type ViewerTool = 'pen' | 'highlighter' | 'stroke-eraser'
+import type { StrokeKind } from '../../../engines/drawing/index'
+
+/** Công cụ của viewer: mọi loại bút (TASK-14D) hoặc tẩy nét. */
+export type ViewerTool = StrokeKind | 'stroke-eraser'
 
 export function clampPageIndex(index: number, pageCount: number): number {
   if (pageCount <= 0) return 0

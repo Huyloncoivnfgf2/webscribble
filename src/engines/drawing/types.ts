@@ -75,17 +75,32 @@ interface DrawingObjectBase {
   updatedAt: number
 }
 
-export interface PenStrokeObject extends DrawingObjectBase {
-  type: 'pen'
+/**
+ * Mọi loại nét vẽ tự do (TASK-14D, DEC-036): hai loại đầu
+ * là dữ liệu gốc từ TASK-05; sáu loại sau cộng thêm mà
+ * KHÔNG đổi cấu trúc object — cảm giác bút suy ra lúc vẽ
+ * từ hồ sơ theo loại (`strokeProfiles.ts`), dữ liệu đã
+ * lưu của pen/highlighter không đổi một byte.
+ */
+export type StrokeKind =
+  | 'pen'
+  | 'highlighter'
+  | 'pencil'
+  | 'ballpoint'
+  | 'marker'
+  | 'fine-pen'
+  | 'thick-pen'
+  | 'watercolor'
+
+/** Object nét vẽ tự do: điểm thô + style, phân biệt bằng `type`. */
+export interface FreehandStrokeObject extends DrawingObjectBase {
+  type: StrokeKind
   points: readonly StrokePoint[]
   style: StrokeStyle
 }
 
-export interface HighlighterStrokeObject extends DrawingObjectBase {
-  type: 'highlighter'
-  points: readonly StrokePoint[]
-  style: StrokeStyle
-}
+export type PenStrokeObject = FreehandStrokeObject & { type: 'pen' }
+export type HighlighterStrokeObject = FreehandStrokeObject & { type: 'highlighter' }
 
 export interface LineObject extends DrawingObjectBase {
   type: 'line'
@@ -131,8 +146,7 @@ export interface TextObject extends DrawingObjectBase {
 
 /** Union type-safe của mọi object mà Drawing Engine quản lý. */
 export type DrawingObject =
-  | PenStrokeObject
-  | HighlighterStrokeObject
+  | FreehandStrokeObject
   | LineObject
   | RectangleObject
   | EllipseObject
@@ -142,7 +156,7 @@ export type DrawingObject =
 export type DrawingObjectType = DrawingObject['type']
 
 /** Các object dạng nét vẽ tự do (có raw points). */
-export type StrokeObject = PenStrokeObject | HighlighterStrokeObject
+export type StrokeObject = FreehandStrokeObject
 
 /** Các object hình vector hai điểm (start/end). */
 export type ShapeObject = LineObject | RectangleObject | EllipseObject | ArrowObject

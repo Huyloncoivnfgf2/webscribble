@@ -24,6 +24,7 @@ import { worldToScreen, type Camera } from './coordinates'
 import { arrowHeadLength, arrowHeadPoints } from './geometry'
 import { layoutTextLines, TEXT_LINE_HEIGHT_FACTOR } from './text'
 import type { DrawingObject, Point, ShapeObject, StrokeObject, TextObject } from './types'
+import { isStrokeKind, strokeProfile } from './strokeProfiles'
 
 // Giữ tương thích ngược cho nơi đã import từ renderer (TASK-05D); hình
 // học đầu mũi tên nay thuộc geometry.ts để bounds/selection dùng chung.
@@ -71,15 +72,16 @@ export interface CanvasContextLike {
   setLineDash(segments: readonly number[]): void
 }
 
-/** Tham số perfect-freehand theo từng công cụ. */
+/** Tham số perfect-freehand theo hồ sơ của loại bút (TASK-14D). */
 function outlineOptions(object: StrokeObject, camera: Camera, complete: boolean) {
+  const profile = strokeProfile(object.type)
   return {
-    // Kích thước trong world units → nhân zoom để ra kích thước màn hình.
-    size: object.style.size * camera.zoom,
-    thinning: object.type === 'pen' ? 0.5 : 0,
-    smoothing: 0.5,
-    streamline: 0.5,
-    simulatePressure: false,
+    // Kích thước hiệu dụng (world) → nhân zoom ra kích thước màn hình.
+    size: object.style.size * profile.sizeScale * camera.zoom,
+    thinning: profile.thinning,
+    smoothing: profile.smoothing,
+    streamline: profile.streamline,
+    simulatePressure: profile.simulatePressure,
     last: complete,
   }
 }
@@ -116,9 +118,10 @@ export function drawStroke(
 ): boolean {
   const outline = strokeOutlinePoints(object, camera, options)
   if (outline.length < 3) return false
+  const profile = strokeProfile(object.type)
   ctx.save()
   try {
-    ctx.globalAlpha = object.style.opacity
+    ctx.globalAlpha = object.style.opacity * profile.opacityScale
     ctx.fillStyle = object.style.color
     ctx.beginPath()
     ctx.moveTo(outline[0].x, outline[0].y)
@@ -126,7 +129,11 @@ export function drawStroke(
       ctx.lineTo(outline[i].x, outline[i].y)
     }
     ctx.closePath()
-    ctx.fill()
+    // Hồ sơ nhiều lớp (màu nước): tô chồng để vùng giao
+    // nhau đậm dần; một lớp thì đúng một lần fill như cũ.
+    for (let pass = 0; pass < profile.passes; pass += 1) {
+      ctx.fill()
+    }
   } finally {
     ctx.restore()
   }
@@ -135,7 +142,7 @@ export function drawStroke(
 
 /** Object có phải nét vẽ tự do (phạm vi render của TASK-05C) hay không. */
 export function isStrokeObject(object: { type: string }): object is StrokeObject {
-  return object.type === 'pen' || object.type === 'highlighter'
+  return isStrokeKind(object.type)
 }
 
 // ---------------------------------------------------------------------------
@@ -294,10 +301,8 @@ export function drawObject(
   camera: Camera,
   options: StrokeRenderOptions = {},
 ): boolean {
+  if (isStrokeObject(object)) return drawStroke(ctx, object, camera, options)
   switch (object.type) {
-    case 'pen':
-    case 'highlighter':
-      return drawStroke(ctx, object, camera, options)
     case 'line':
     case 'rectangle':
     case 'ellipse':

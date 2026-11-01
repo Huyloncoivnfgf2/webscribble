@@ -1,9 +1,12 @@
 import {
   DrawingEngine,
+  STROKE_KINDS,
+  STROKE_PROFILES,
   type CanvasLike,
   type DrawingSurface,
   type PinchGestureEvent,
   type PointerTargetLike,
+  type StrokeKind,
 } from '../../../engines/drawing/index'
 import type {
   AnnotationEngine,
@@ -24,6 +27,7 @@ import {
   type ViewerTool,
 } from '../documents/pdfViewerState'
 import { inspectBackgroundImage } from '../backgrounds/paperBackground'
+import type { PenPreset } from '../pens/penPresets'
 import {
   WhiteboardError,
   type WhiteboardManifest,
@@ -62,10 +66,10 @@ export interface WhiteboardSnapshot {
 
 export const WB_PEN_COLORS = ['#111827', '#F8FAFC', '#DC2626', '#2563EB', '#16A34A']
 export const WB_HIGHLIGHT_COLORS = ['#FDE047', '#86EFAC', '#F9A8D4', '#93C5FD']
-export const WB_TOOL_SIZES: Record<'pen' | 'highlighter', Record<'S' | 'M' | 'L', number>> = {
-  pen: { S: 2, M: 3.5, L: 5 },
-  highlighter: { S: 10, M: 16, L: 24 },
-}
+export const WB_TOOL_SIZES: Record<StrokeKind, Record<'S' | 'M' | 'L', number>> =
+  Object.fromEntries(
+    STROKE_KINDS.map((kind) => [kind, STROKE_PROFILES[kind].sizes]),
+  ) as Record<StrokeKind, Record<'S' | 'M' | 'L', number>>
 
 /** Chuẩn hóa lỗi lưu (unknown từ Annotation Engine) thành thông điệp. */
 function saveErrorText(error: unknown): string | null {
@@ -311,11 +315,24 @@ export class WhiteboardController {
 
   setTool(tool: ViewerTool): void {
     let color = this.state.color
-    if (tool === 'pen' && !WB_PEN_COLORS.includes(color)) color = WB_PEN_COLORS[0]
+    // Dạ quang dùng bảng màu riêng; mọi loại bút mực dùng
+    // bảng màu bút (TASK-14D):
     if (tool === 'highlighter' && !WB_HIGHLIGHT_COLORS.includes(color)) {
       color = WB_HIGHLIGHT_COLORS[0]
+    } else if (tool !== 'stroke-eraser' && tool !== 'highlighter' && !WB_PEN_COLORS.includes(color)) {
+      color = WB_PEN_COLORS[0]
     }
     this.setState({ tool, color })
+    this.applyToolToEngine()
+  }
+
+  /** Áp một preset bút (TASK-14D): loại + màu + cỡ cùng lúc, màu preset là chuẩn. */
+  applyPreset(preset: PenPreset): void {
+    this.setState({
+      tool: preset.kind,
+      color: preset.color,
+      sizeLabel: preset.sizeLabel,
+    })
     this.applyToolToEngine()
   }
 

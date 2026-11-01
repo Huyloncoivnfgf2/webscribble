@@ -18,7 +18,8 @@
  */
 
 import { boundsFromPoints, boundsIntersect, expandBounds, segmentToSegmentDistance } from './geometry'
-import { createHighlighterStroke, createPenStroke } from './objects'
+import { createStrokeOfKind } from './objects'
+import { isStrokeKind, STROKE_PROFILES } from './strokeProfiles'
 import type { PointerInputEvent } from './input'
 import type { DrawingSurface } from './surface'
 import type { ObjectId, Point, StrokeObject, StrokePoint } from './types'
@@ -27,12 +28,12 @@ import type { ObjectId, Point, StrokeObject, StrokePoint } from './types'
 export const DEFAULT_ERASER_SIZE = 20
 
 function isStrokeObject(object: { type: string }): object is StrokeObject {
-  return object.type === 'pen' || object.type === 'highlighter'
+  return isStrokeKind(object.type)
 }
 
 /** Bán kính hiệu dụng khi tẩy một nét: bán kính tẩy + nửa độ dày nét (tẩy theo mực, không chỉ theo đường tâm). */
 export function effectiveEraseRadius(object: StrokeObject, eraserRadius: number): number {
-  return eraserRadius + object.style.size / 2
+  return eraserRadius + (object.style.size * STROKE_PROFILES[object.type].sizeScale) / 2
 }
 
 /**
@@ -330,20 +331,14 @@ export class SegmentEraserTool extends EraserToolBase {
       if (!isStrokeObject(object)) continue
       const runs = eraseCircleFromStroke(object, center, this.radius)
       if (runs === null) continue
+      // Đoạn còn lại GIỮ NGUYÊN loại bút của nét gốc (TASK-14D):
       const replacements = runs.map((runPoints) =>
-        object.type === 'pen'
-          ? createPenStroke({
-              surfaceId: object.surfaceId,
-              points: runPoints,
-              style: object.style,
-              createdAt: object.createdAt,
-            })
-          : createHighlighterStroke({
-              surfaceId: object.surfaceId,
-              points: runPoints,
-              style: object.style,
-              createdAt: object.createdAt,
-            }),
+        createStrokeOfKind(object.type, {
+          surfaceId: object.surfaceId,
+          points: runPoints,
+          style: object.style,
+          createdAt: object.createdAt,
+        }),
       )
       this.surface.replaceObject(object.id, replacements)
       if (!changed.includes(object.id)) changed.push(object.id)

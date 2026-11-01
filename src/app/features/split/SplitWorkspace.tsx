@@ -3,13 +3,14 @@ import {
   Columns2,
   Download,
   Eraser,
-  Highlighter,
-  Pen,
   Plus,
   Redo2,
   Undo2,
 } from 'lucide-react'
 import { getAppStorage } from '../../storage'
+import { isStrokeKind } from '../../../engines/drawing/index'
+import { PenKindSelect } from '../pens/PenKindSelect'
+import { PenPresetBar } from '../pens/PenPresetBar'
 import { DOCX_MIME_TYPE } from '../../../engines/word/index'
 import { WordEditor, peekDocxAnnotationController } from '../documents/WordEditor'
 import type { DocumentMetadata } from '../../../data/index'
@@ -376,28 +377,23 @@ export function SplitWorkspace({
         <span className="px-1 text-xs font-medium text-slate-500">
           Công cụ cho: {snapshot.activePane === 'left' ? leftTitle : rightTitle}
         </span>
-        {(
-          [
-            { tool: 'pen', label: 'Bút', Icon: Pen },
-            { tool: 'highlighter', label: 'Highlight', Icon: Highlighter },
-            { tool: 'stroke-eraser', label: 'Tẩy nét', Icon: Eraser },
-          ] as const
-        ).map(({ tool, label, Icon }) => (
-          <button
-            key={tool}
-            type="button"
-            aria-label={label}
-            aria-pressed={toolState.tool === tool}
-            onClick={() => split.setTool(tool)}
-            className={`rounded-lg p-2 transition ${
-              toolState.tool === tool
-                ? 'bg-blue-600 text-white'
-                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-            }`}
-          >
-            <Icon className="h-4 w-4" />
-          </button>
-        ))}
+        <PenKindSelect
+          value={isStrokeKind(toolState.tool) ? toolState.tool : 'pen'}
+          onChange={(kind) => split.setTool(kind)}
+        />
+        <button
+          type="button"
+          aria-label="Tẩy nét"
+          aria-pressed={toolState.tool === 'stroke-eraser'}
+          onClick={() => split.setTool('stroke-eraser')}
+          className={`rounded-lg p-2 transition ${
+            toolState.tool === 'stroke-eraser'
+              ? 'bg-blue-600 text-white'
+              : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+          }`}
+        >
+          <Eraser className="h-4 w-4" />
+        </button>
         {capabilities.color && toolState.tool !== 'stroke-eraser' && (
           <span className="flex items-center gap-1">
             {colors.map((color) => (
@@ -433,6 +429,14 @@ export function SplitWorkspace({
             ))}
           </span>
         )}
+        <PenPresetBar
+          current={
+            isStrokeKind(toolState.tool)
+              ? { kind: toolState.tool, color: toolState.color, sizeLabel: toolState.sizeLabel }
+              : null
+          }
+          onApply={(preset) => split.applyPreset(preset)}
+        />
         <span className="mx-1 h-5 w-px bg-slate-200" />
         <button
           type="button"

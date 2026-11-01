@@ -5,10 +5,15 @@ import type {
 } from '../../../engines/annotation/index'
 import {
   DrawingEngine,
+  isStrokeKind,
+  STROKE_KINDS,
+  STROKE_PROFILES,
   type CanvasLike,
   type PointerTargetLike,
+  type StrokeKind,
 } from '../../../engines/drawing/index'
 import type { ViewerTool } from './pdfViewerState'
+import type { PenPreset } from '../pens/penPresets'
 
 /**
  * DocxAnnotationController (TASK-07D) — bộ điều phối KHÔNG phụ
@@ -56,18 +61,16 @@ const DOCX_SURFACE_SIZE = { width: 10_000, height: 1_000_000 }
 export const DOCX_PEN_COLORS: readonly string[] = ['#111827', '#DC2626', '#2563EB', '#16A34A']
 export const DOCX_HIGHLIGHT_COLORS: readonly string[] = ['#FDE047', '#86EFAC', '#F9A8D4', '#93C5FD']
 
-export const DOCX_TOOL_SIZES: Record<'pen' | 'highlighter', readonly { label: string; size: number }[]> = {
-  pen: [
-    { label: 'S', size: 2 },
-    { label: 'M', size: 3.5 },
-    { label: 'L', size: 5 },
-  ],
-  highlighter: [
-    { label: 'S', size: 10 },
-    { label: 'M', size: 16 },
-    { label: 'L', size: 24 },
-  ],
-}
+export const DOCX_TOOL_SIZES: Record<StrokeKind, readonly { label: string; size: number }[]> =
+  Object.fromEntries(
+    STROKE_KINDS.map((kind) => [
+      kind,
+      (['S', 'M', 'L'] as const).map((label) => ({
+        label,
+        size: STROKE_PROFILES[kind].sizes[label],
+      })),
+    ]),
+  ) as unknown as Record<StrokeKind, readonly { label: string; size: number }[]>
 
 const IDLE_SNAPSHOT: DocxAnnotationSnapshot = {
   status: 'idle',
@@ -126,7 +129,7 @@ export class DocxAnnotationController {
 
   /** Style hiện tại cho tool vẽ nét (pen/highlighter). */
   private currentStrokeStyle(): { color: string; size: number } {
-    const tool = this.state.tool === 'highlighter' ? 'highlighter' : 'pen'
+    const tool: StrokeKind = isStrokeKind(this.state.tool) ? this.state.tool : 'pen'
     const entry =
       DOCX_TOOL_SIZES[tool].find((s) => s.label === this.state.sizeLabel) ?? DOCX_TOOL_SIZES[tool][1]
     return { color: this.state.color, size: entry.size }
@@ -247,11 +250,14 @@ export class DocxAnnotationController {
     // Đổi tool → màu mặc định của tool đó nếu màu hiện tại
     // không thuộc bảng màu của tool mới (tránh highlighter
     // mang màu bút đen đặc khó đọc và ngược lại).
-    if (tool === 'pen' && !DOCX_PEN_COLORS.includes(this.state.color)) {
-      patch.color = DOCX_PEN_COLORS[0]
-    }
     if (tool === 'highlighter' && !DOCX_HIGHLIGHT_COLORS.includes(this.state.color)) {
       patch.color = DOCX_HIGHLIGHT_COLORS[0]
+    } else if (
+      tool !== 'stroke-eraser' &&
+      tool !== 'highlighter' &&
+      !DOCX_PEN_COLORS.includes(this.state.color)
+    ) {
+      patch.color = DOCX_PEN_COLORS[0]
     }
     this.setState(patch)
     this.applyToolToEngine()
@@ -264,6 +270,16 @@ export class DocxAnnotationController {
 
   setSizeLabel(sizeLabel: string): void {
     this.setState({ sizeLabel })
+    this.applyToolToEngine()
+  }
+
+  /** Áp một preset bút (TASK-14D): loại + màu + cỡ cùng lúc. */
+  applyPreset(preset: PenPreset): void {
+    this.setState({
+      tool: preset.kind,
+      color: preset.color,
+      sizeLabel: preset.sizeLabel,
+    })
     this.applyToolToEngine()
   }
 

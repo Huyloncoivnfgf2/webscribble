@@ -1,15 +1,21 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowLeft,
+  Brush,
   ChevronLeft,
   ChevronRight,
   CircleAlert,
   Download,
+  Droplets,
   Eraser,
   Highlighter,
   LoaderCircle,
   Maximize,
+  Paintbrush,
   Pen,
+  PenLine,
+  PenTool,
+  Pencil,
   Redo2,
   Undo2,
   ZoomIn,
@@ -36,8 +42,14 @@ export interface PdfViewerProps {
 }
 
 const TOOL_BUTTONS: { tool: ViewerTool; label: string; Icon: typeof Pen }[] = [
-  { tool: 'pen', label: 'Bút', Icon: Pen },
-  { tool: 'highlighter', label: 'Highlight', Icon: Highlighter },
+  { tool: 'pen', label: 'Bút mực', Icon: Pen },
+  { tool: 'pencil', label: 'Bút chì', Icon: Pencil },
+  { tool: 'ballpoint', label: 'Bút bi', Icon: PenTool },
+  { tool: 'marker', label: 'Bút dạ', Icon: Brush },
+  { tool: 'fine-pen', label: 'Nét mảnh', Icon: PenLine },
+  { tool: 'thick-pen', label: 'Nét dày', Icon: Paintbrush },
+  { tool: 'watercolor', label: 'Màu nước', Icon: Droplets },
+  { tool: 'highlighter', label: 'Dạ quang', Icon: Highlighter },
   { tool: 'stroke-eraser', label: 'Tẩy', Icon: Eraser },
 ]
 

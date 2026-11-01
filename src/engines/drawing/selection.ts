@@ -34,7 +34,8 @@ import {
 import { worldToScreen, type Camera } from './coordinates'
 import type { CanvasContextLike } from './renderer'
 import type { DrawingSurface } from './surface'
-import type { Bounds, DrawingObject, ObjectId, Point } from './types'
+import type { Bounds, DrawingObject, ObjectId, Point, StrokeObject } from './types'
+import { isStrokeKind, STROKE_PROFILES } from './strokeProfiles'
 import type { PointerInputEvent, PointerSample } from './input'
 
 // ---------------------------------------------------------------------------
@@ -125,10 +126,15 @@ export function objectIntersectsRegion(
   // Tầng 1: lọc ứng viên bằng bounds (bounds nay là phạm vi mực thật).
   if (!boundsIntersect(object.bounds, boundsFromPoints(polygon))) return false
   // Tầng 2: kết luận bằng hình học theo loại object.
+  if (isStrokeKind(object.type)) {
+    const stroke = object as StrokeObject
+    return polylineIntersectsPolygon(
+      stroke.points,
+      (stroke.style.size * STROKE_PROFILES[stroke.type].sizeScale) / 2,
+      polygon,
+    )
+  }
   switch (object.type) {
-    case 'pen':
-    case 'highlighter':
-      return polylineIntersectsPolygon(object.points, object.style.size / 2, polygon)
     case 'line':
       return polylineIntersectsPolygon(
         [object.start, object.end],
@@ -353,6 +359,12 @@ export function translateObject(object: DrawingObject, delta: Point): DrawingObj
   switch (object.type) {
     case 'pen':
     case 'highlighter':
+    case 'pencil':
+    case 'ballpoint':
+    case 'marker':
+    case 'fine-pen':
+    case 'thick-pen':
+    case 'watercolor':
       moved = {
         ...object,
         points: object.points.map((point) => ({ ...point, ...move(point) })),

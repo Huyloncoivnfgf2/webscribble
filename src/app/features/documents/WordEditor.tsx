@@ -13,7 +13,6 @@ import {
   Heading1,
   Heading2,
   Heading3,
-  Highlighter,
   Italic,
   List,
   ListOrdered,
@@ -52,6 +51,9 @@ import {
   useBackgroundImageUrl,
 } from '../backgrounds/paperBackground'
 import { BackgroundPicker } from '../backgrounds/BackgroundPicker'
+import { PenKindSelect } from '../pens/PenKindSelect'
+import { PenPresetBar } from '../pens/PenPresetBar'
+import { isStrokeKind } from '../../../engines/drawing/index'
 import {
   DocxAnnotationController,
   DOCX_HIGHLIGHT_COLORS,
@@ -188,10 +190,8 @@ function DocxAnnotationBar({
 
   const anno = snapshot
   const colors = anno.tool === 'highlighter' ? DOCX_HIGHLIGHT_COLORS : DOCX_PEN_COLORS
-  const sizes = anno.tool === 'highlighter' ? DOCX_TOOL_SIZES.highlighter : DOCX_TOOL_SIZES.pen
+  const sizes = DOCX_TOOL_SIZES[isStrokeKind(anno.tool) ? anno.tool : 'pen']
   const toolButtons: { tool: ViewerTool; label: string; Icon: typeof Pen }[] = [
-    { tool: 'pen', label: 'Bút', Icon: Pen },
-    { tool: 'highlighter', label: 'Highlight', Icon: Highlighter },
     { tool: 'stroke-eraser', label: 'Tẩy', Icon: Eraser },
   ]
 
@@ -230,6 +230,10 @@ function DocxAnnotationBar({
       {anno.mode === 'annotate' && anno.status === 'ready' && (
         <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm">
           <div className="flex items-center gap-1" role="group" aria-label="Công cụ vẽ">
+            <PenKindSelect
+              value={isStrokeKind(anno.tool) ? anno.tool : 'pen'}
+              onChange={(kind) => controller.setTool(kind)}
+            />
             {toolButtons.map(({ tool, label, Icon }) => (
               <button
                 key={tool}
@@ -279,6 +283,20 @@ function DocxAnnotationBar({
               </div>
             </>
           )}
+          <PenPresetBar
+            current={
+              isStrokeKind(anno.tool)
+                ? {
+                    kind: anno.tool,
+                    color: anno.color,
+                    sizeLabel: (['S', 'M', 'L'].includes(anno.sizeLabel)
+                      ? anno.sizeLabel
+                      : 'M') as 'S' | 'M' | 'L',
+                  }
+                : null
+            }
+            onApply={(preset) => controller.applyPreset(preset)}
+          />
           <div className="flex items-center gap-1">
             <button
               type="button"

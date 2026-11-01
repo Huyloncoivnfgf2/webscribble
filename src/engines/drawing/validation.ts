@@ -1,5 +1,6 @@
 import { boundsEqual, computeObjectBounds } from './geometry'
-import type { Bounds, DrawingObject, Point, StrokePoint } from './types'
+import type { Bounds, DrawingObject, Point, StrokeObject, StrokePoint } from './types'
+import { isStrokeKind, STROKE_KINDS } from './strokeProfiles'
 
 /**
  * Kiểm chứng dữ liệu object — dùng khi nạp dữ liệu từ persistence
@@ -65,8 +66,7 @@ function checkStrokePoint(value: unknown, index: number, errors: string[]): void
 }
 
 const OBJECT_TYPES: readonly string[] = [
-  'pen',
-  'highlighter',
+  ...STROKE_KINDS,
   'line',
   'rectangle',
   'ellipse',
@@ -95,7 +95,7 @@ export function validateDrawingObject(value: unknown): ValidationResult {
     return { valid: false, errors }
   }
 
-  if (value.type === 'pen' || value.type === 'highlighter') {
+  if (isStrokeKind(value.type)) {
     if (!Array.isArray(value.points) || value.points.length === 0) {
       errors.push('points must be a non-empty array')
     } else {
@@ -160,8 +160,8 @@ export function validateDrawingObject(value: unknown): ValidationResult {
       errors.push('bounds do not match the bounds computed from the object data')
     }
     // Kiểm tra bổ sung cho stroke: time không giảm dần.
-    if (object.type === 'pen' || object.type === 'highlighter') {
-      const points: readonly StrokePoint[] = object.points
+    if (isStrokeKind(object.type)) {
+      const points: readonly StrokePoint[] = (object as StrokeObject).points
       for (let i = 1; i < points.length; i += 1) {
         if (points[i].time < points[i - 1].time) {
           errors.push('points time must be non-decreasing within a stroke')

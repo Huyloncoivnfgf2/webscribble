@@ -552,7 +552,9 @@ export class PdfViewerController {
     this.setState({ tool })
     const engine = this.drawingEngine
     if (engine === null) return
-    if (tool === 'pen' || tool === 'highlighter') engine.setTool(tool)
+    // Mọi loại bút đi thẳng vào engine (hồ sơ bút quyết
+    // định style mặc định); tẩy là công cụ riêng:
+    if (tool === 'stroke-eraser') engine.setTool('stroke-eraser')
     else engine.setTool(tool)
   }
 

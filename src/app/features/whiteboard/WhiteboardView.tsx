@@ -5,12 +5,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Eraser,
-  Highlighter,
   LoaderCircle,
   Maximize,
   MoveLeft,
   MoveRight,
-  Pen,
   Plus,
   Trash,
   TriangleAlert,
@@ -26,6 +24,8 @@ import {
   useBackgroundImageUrl,
 } from '../backgrounds/paperBackground'
 import { BackgroundPicker } from '../backgrounds/BackgroundPicker'
+import { PenKindSelect } from '../pens/PenKindSelect'
+import { PenPresetBar } from '../pens/PenPresetBar'
 import {
   attachAutoScroll,
   dispatchAutoScrollMove,
@@ -272,12 +272,10 @@ export function WhiteboardView({
       ) : (
         <>
           <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2 py-1.5 shadow-sm">
-            <ToolButton label="Bút" active={snapshot.tool === 'pen'} onClick={() => controller.setTool('pen')}>
-              <Pen className="h-4 w-4" />
-            </ToolButton>
-            <ToolButton label="Highlight" active={snapshot.tool === 'highlighter'} onClick={() => controller.setTool('highlighter')}>
-              <Highlighter className="h-4 w-4" />
-            </ToolButton>
+            <PenKindSelect
+              value={snapshot.tool === 'stroke-eraser' ? 'pen' : snapshot.tool}
+              onChange={(kind) => controller.setTool(kind)}
+            />
             <ToolButton label="Tẩy nét" active={snapshot.tool === 'stroke-eraser'} onClick={() => controller.setTool('stroke-eraser')}>
               <Eraser className="h-4 w-4" />
             </ToolButton>
@@ -320,6 +318,15 @@ export function WhiteboardView({
                 <span className="mx-1 h-5 w-px bg-slate-200" />
               </>
             )}
+            <PenPresetBar
+              current={
+                snapshot.tool === 'stroke-eraser'
+                  ? null
+                  : { kind: snapshot.tool, color: snapshot.color, sizeLabel: snapshot.sizeLabel }
+              }
+              onApply={(preset) => controller.applyPreset(preset)}
+            />
+            <span className="mx-1 h-5 w-px bg-slate-200" />
             <ToolButton label="Hoàn tác" onClick={() => controller.undo()}>
               <Undo2 className={`h-4 w-4 ${snapshot.canUndo ? '' : 'opacity-35'}`} />
             </ToolButton>
