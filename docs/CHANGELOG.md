@@ -5,6 +5,45 @@
 
 ## Lịch sử
 
+### TASK-14C — 2026-11-01 — Nền giấy dùng chung cho whiteboard/PDF/DOCX (docs v1.38)
+
+- **DEC-035** (xem DECISIONS): mô hình `PaperBackground`
+  10 loại ở Data Layer + `normalizePaperBackground`
+  tương thích dữ liệu chuỗi cũ; Dexie v3 cộng thêm
+  `documentBackgrounds` + `backgroundImages` (khóa
+  suy dẫn `<documentId>:<slot>`); manifest whiteboard
+  giữ version 1, parser chấp nhận chuỗi cũ + object
+  mới; backup giữ format v1, mở rộng tùy chọn mang
+  theo nền + ảnh; xóa tài liệu cascade cả nền/ảnh.
+- **UI dùng chung** `features/backgrounds/`: hàm CSS
+  `paperBackgroundStyle` đủ 10 loại (kẻ nhạc = cụm 5
+  dòng/ô 64px; kẻ toán = ô mịn 14 + đường chính 70)
+  và `BackgroundPicker` (loại nền + khoảng dòng +
+  tải ảnh). Whiteboard bỏ `patternStyle` nội bộ, PDF
+  thêm nền vào PdfViewerController (SplitPdfPane
+  hưởng theo), DOCX áp lên thẻ trang editor (bảng
+  đen đổi chữ sang sáng qua `data-paper-dark`).
+- **Ảnh nền:** kiểm tra MIME + chữ ký byte đầu +
+  ≤ 5MB (`inspectBackgroundImage`), lưu Blob theo
+  slot; whiteboard remap slot khi xóa/đổi thứ tự
+  trang và dọn slot khi nền không còn là ảnh.
+- **Kiểm chứng:** **639/639 test (59 file)** — 18
+  test mới: chuẩn hóa dữ liệu cũ, CSS từng loại,
+  kiểm tra ảnh (sai MIME/sai chữ ký/quá cỡ), migration
+  v2→v3 dựng DB v2 thật (dữ liệu nguyên vẹn + cascade
+  xóa), manifest chuỗi cũ, remap slot ảnh qua xóa/
+  tráo trang, backup có nền khôi phục + remap ID,
+  backup cũ không nền vẫn khôi phục. 4 test cũ cập
+  nhật kỳ vọng theo mô hình object (hành vi không
+  đổi). Lint 0 lỗi (3 warning cũ), build đạt (SW
+  `0eadb4753b07`). Browser QA production **18/18**:
+  mọi loại nền trên whiteboard đúng pattern theo
+  scale trực tiếp, tải ảnh thật hiện blob cover, ảnh
+  giả bị từ chối kèm thông báo và giữ nền cũ, reload
+  còn nguyên nền ảnh; PDF pattern nằm dưới trang và
+  canvas bỏ nền trắng; DOCX caro + bảng đen đúng.
+  Chưa kiểm chứng thiết bị thật/Safari (ISSUE-006).
+
 ### TASK-14B — 2026-11-01 — Gesture hai ngón pan/zoom (docs v1.37)
 
 - **input.ts:** PointerInputManager theo dõi pointer

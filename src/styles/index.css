@@ -8,6 +8,10 @@
   font-size: 1rem;
   line-height: 1.7;
 }
+/* Nền bảng đen (TASK-14C): chữ nội dung chuyển sáng cho đọc được. */
+.word-editor-surface[data-paper-dark='true'] .word-editor-content .ProseMirror {
+  color: #e2e8f0;
+}
 .word-editor-content .ProseMirror > * + * {
   margin-top: 0.75em;
 }

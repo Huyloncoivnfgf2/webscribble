@@ -24,6 +24,118 @@ export const DOCUMENT_CONTENT_VERSION = 2
 /** Tên database IndexedDB duy nhất của WebScribble. */
 export const DATABASE_NAME = 'webscribble'
 
+/**
+ * Kiểu nền giấy DÙNG CHUNG cho mọi bề mặt (TASK-14C, DEC-035):
+ * whiteboard (từng trang), PDF và DOCX (theo tài liệu). Đây là
+ * mô hình DỮ LIỆU đã lưu nên sống ở Data Layer; nhãn hiển thị và
+ * CSS pattern thuộc tầng UI (`features/backgrounds`).
+ *
+ * Năm giá trị đầu giữ nguyên ngữ nghĩa của WhiteboardBackground
+ * cũ (TASK-12) để manifest bảng trắng đã lưu ánh xạ 1-1, không
+ * mất dữ liệu: blank/dark/ruled/grid/dots.
+ */
+export type PaperBackgroundKind =
+  | 'blank'
+  | 'dark'
+  | 'ruled'
+  | 'grid'
+  | 'dots'
+  | 'dot-grid'
+  | 'graph'
+  | 'math'
+  | 'music'
+  | 'image'
+
+export interface PaperBackground {
+  kind: PaperBackgroundKind
+  /** Khoảng cách dòng (px ở scale 1) — chỉ có nghĩa với kind 'ruled'. */
+  spacingPx?: number
+}
+
+/** Nền mặc định: giấy trắng trơn. */
+export const DEFAULT_PAPER_BACKGROUND: PaperBackground = { kind: 'blank' }
+
+/** Các khoảng cách dòng hợp lệ của nền kẻ dòng. */
+export const RULED_SPACINGS_PX: readonly number[] = [24, 32, 40]
+
+const PAPER_BACKGROUND_KINDS: readonly string[] = [
+  'blank',
+  'dark',
+  'ruled',
+  'grid',
+  'dots',
+  'dot-grid',
+  'graph',
+  'math',
+  'music',
+  'image',
+]
+
+/**
+ * Chuẩn hóa một giá trị nền BẤT KỲ (dữ liệu đã lưu từ các phiên
+ * bản cũ: chuỗi WhiteboardBackground, object, hoặc rác) thành
+ * PaperBackground hợp lệ. Không bao giờ ném lỗi: không nhận ra
+ * thì về giấy trắng — một nền lạ không được phép làm hỏng việc
+ * mở tài liệu.
+ */
+export function normalizePaperBackground(raw: unknown): PaperBackground {
+  if (typeof raw === 'string') {
+    return PAPER_BACKGROUND_KINDS.includes(raw)
+      ? { kind: raw as PaperBackgroundKind }
+      : { ...DEFAULT_PAPER_BACKGROUND }
+  }
+  if (raw !== null && typeof raw === 'object') {
+    const kind = (raw as { kind?: unknown }).kind
+    if (typeof kind === 'string' && PAPER_BACKGROUND_KINDS.includes(kind)) {
+      const spacing = (raw as { spacingPx?: unknown }).spacingPx
+      return {
+        kind: kind as PaperBackgroundKind,
+        ...(kind === 'ruled' &&
+        typeof spacing === 'number' &&
+        RULED_SPACINGS_PX.includes(spacing)
+          ? { spacingPx: spacing }
+          : {}),
+      }
+    }
+  }
+  return { ...DEFAULT_PAPER_BACKGROUND }
+}
+
+/** Bản ghi nền theo tài liệu (PDF/DOCX) — Dexie schema v3. */
+export interface DocumentBackgroundRecord {
+  documentId: string
+  background: PaperBackground
+  updatedAt: number
+}
+
+/** Slot ảnh nền của tài liệu gốc; trang whiteboard i dùng `page-<i>`. */
+export const MAIN_BACKGROUND_SLOT = 'main'
+
+export function whiteboardPageBackgroundSlot(pageIndex: number): string {
+  return `page-${pageIndex}`
+}
+
+/**
+ * Khóa SUY DẪN của một ảnh nền: `<documentId>:<slot>`. Khôi
+ * phục backup đổi ID tài liệu thì khóa ảnh tự đi theo ID mới —
+ * không tham chiếu nào phải viết lại (DEC-035).
+ */
+export function backgroundImageKey(documentId: string, slot: string): string {
+  return `${documentId}:${slot}`
+}
+
+/** Bản ghi ảnh nền tải lên — Dexie schema v3. Blob lưu nguyên vẹn. */
+export interface BackgroundImageRecord {
+  /** Khóa suy dẫn (xem `backgroundImageKey`). */
+  id: string
+  documentId: string
+  slot: string
+  mimeType: string
+  size: number
+  updatedAt: number
+  blob: Blob
+}
+
 /** Bản ghi tài liệu đầy đủ, gồm cả Blob gốc nguyên vẹn. */
 export interface DocumentRecord {
   id: string

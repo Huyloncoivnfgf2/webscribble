@@ -607,6 +607,57 @@
   SW chỉ ở bản production.
 - **Ngày:** 2026-10-31 · **Trạng thái:** ACTIVE
 
+### DEC-035 — Nền giấy dùng chung: một mô hình, Dexie v3 cộng thêm, khóa ảnh suy dẫn (TASK-14C)
+
+- **Bối cảnh:** TASK-12 chỉ có 5 nền dạng chuỗi trong
+  manifest whiteboard. TASK-14C cần 10 loại nền cho cả
+  PDF, DOCX và giấy trắng, nền lưu theo tài liệu, ảnh
+  nền tải lên, và không được mất dữ liệu/migration
+  nguy hiểm cho dữ liệu hiện có.
+- **Quyết định:** (1) Mô hình dữ liệu duy nhất
+  `PaperBackground {kind, spacingPx?}` sống ở Data
+  Layer (`src/data/types.ts`) gồm 10 loại: blank,
+  dark (bảng đen), ruled (kẻ dòng — spacing 24/32/40),
+  grid (kẻ ô vuông), dot-grid (lưới chấm), dots (chấm
+  so le), graph (lưới caro), math (kẻ toán), music
+  (kẻ nhạc), image (ảnh tải lên). `normalizePaper-
+  Background` nhận cả chuỗi WhiteboardBackground cũ
+  (ánh xạ 1-1) lẫn object; giá trị lạ về blank, không
+  bao giờ ném lỗi. (2) Whiteboard manifest GIỮ
+  version 1: nền trang từ nay ghi dạng object, parser
+  chấp nhận cả hai dạng — app cũ đọc manifest mới chỉ
+  suy biến nền về trắng chứ không lỗi; tăng version
+  sẽ làm app cũ từ chối toàn bộ manifest nên không
+  làm vậy. (3) Dexie schema v3 CỘNG THÊM hai bảng:
+  `documentBackgrounds` (nền theo tài liệu cho
+  PDF/DOCX) và `backgroundImages` (Blob ảnh nền) —
+  cùng khuôn migration cộng thêm của v2; xóa tài
+  liệu cascade mở rộng sang cả hai bảng. (4) Khóa
+  ảnh SUY DẪN `<documentId>:<slot>` (slot `main`
+  cho tài liệu, `page-<i>` cho trang whiteboard):
+  restore backup đổi ID tài liệu thì khóa ảnh tự đi
+  theo, không phải viết lại tham chiếu ở đâu cả;
+  WhiteboardStore remap slot ảnh khi xóa/đổi thứ tự
+  trang bằng đúng bản đồ trang của annotation. (5)
+  Backup GIỮ format version 1, mở rộng tùy chọn:
+  `data/backgrounds.json` (checksum như các file dữ
+  liệu khác) + file bytes ảnh + counts tùy chọn —
+  app mới đọc được backup cũ, backup mới khôi phục
+  trọn nền + ảnh; app cũ đọc backup mới bỏ qua phần
+  nền một cách an toàn. (6) Ảnh nền: MIME thuộc
+  {PNG, JPEG, WebP, GIF} VÀ chữ ký byte đầu phải
+  khớp, tối đa 5MB, lưu Blob nguyên vẹn. (7) Trình
+  bày dùng chung: `paperBackgroundStyle` + thành
+  phần `BackgroundPicker` cho cả ba bề mặt; hiển thị
+  theo bản chất từng bề mặt — whiteboard: nền của
+  chính trang; DOCX: nền thẻ trang editor (bảng đen
+  đồng thời chuyển chữ nội dung sang sáng); PDF: lớp
+  DƯỚI trang (trang PDF trong suốt ở vùng không nội
+  dung nên giấy hiện xuyên qua vùng trống; nền trắng
+  trơn giữ nguyên hiển thị cũ). Xuất PDF/DOCX không
+  bị ảnh hưởng bởi nền.
+- **Ngày:** 2026-11-01 · **Trạng thái:** ACTIVE
+
 ---
 
 ## Đề xuất chờ xác nhận — CHƯA PHẢI QUYẾT ĐỊNH

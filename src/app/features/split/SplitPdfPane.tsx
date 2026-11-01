@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Maximize, ZoomIn, ZoomOut } from 'lucide-react'
 import { getAppStorage } from '../../storage'
+import {
+  paperBackgroundStyle,
+  useBackgroundImageUrl,
+} from '../backgrounds/paperBackground'
+import { BackgroundPicker } from '../backgrounds/BackgroundPicker'
 import { PdfViewerController, type PdfViewerSnapshot } from '../documents/PdfViewerController'
 import { pdfPaneAdapter, type DrawingPaneAdapter } from './SplitController'
 
@@ -32,6 +37,8 @@ export function SplitPdfPane({
     const controller = new PdfViewerController({
       documents: foundation.documents,
       annotationEngine,
+      backgrounds: foundation.backgrounds,
+      backgroundImages: foundation.backgroundImages,
     })
     controllerRef.current = controller
     setSnapshot(controller.getSnapshot())
@@ -60,6 +67,11 @@ export function SplitPdfPane({
 
   const controller = controllerRef.current
   const ready = snapshot?.status === 'ready'
+  const [backgroundImageError, setBackgroundImageError] = useState<string | null>(null)
+  const backgroundImageUrl = useBackgroundImageUrl(
+    snapshot?.documentId ?? null,
+    snapshot?.background.kind ?? 'blank',
+  )
 
   return (
     <div className="flex h-full flex-col gap-2">
@@ -73,9 +85,17 @@ export function SplitPdfPane({
             style={{
               width: snapshot?.pageCssWidth ? `${snapshot.pageCssWidth}px` : undefined,
               height: snapshot?.pageCssHeight ? `${snapshot.pageCssHeight}px` : undefined,
+              ...(snapshot !== null
+                ? paperBackgroundStyle(snapshot.background, snapshot.scale, backgroundImageUrl)
+                : {}),
             }}
           >
-            <canvas ref={pdfCanvasRef} className="absolute left-0 top-0 bg-white shadow" />
+            <canvas
+              ref={pdfCanvasRef}
+              className={`absolute left-0 top-0 shadow ${
+                (snapshot?.background.kind ?? 'blank') === 'blank' ? 'bg-white' : ''
+              }`}
+            />
             <canvas
               ref={annoCanvasRef}
               aria-label="Bề mặt chú thích PDF (Split)"
@@ -93,7 +113,7 @@ export function SplitPdfPane({
           <p className="absolute inset-x-4 top-4 z-20 text-sm text-slate-500">Đang mở tài liệu…</p>
         )}
       </div>
-      <div className="flex items-center justify-center gap-1 text-slate-600">
+      <div className="flex flex-wrap items-center justify-center gap-1 text-slate-600">
         <button
           type="button"
           aria-label="Trang trước"
@@ -144,6 +164,23 @@ export function SplitPdfPane({
         >
           <Maximize className="h-4 w-4" />
         </button>
+        <span className="mx-1 h-4 w-px bg-slate-200" />
+        <BackgroundPicker
+          value={snapshot?.background ?? { kind: 'blank' }}
+          disabled={!ready}
+          imageError={backgroundImageError}
+          onChange={(background) => {
+            setBackgroundImageError(null)
+            void controller?.setBackground(background)
+          }}
+          onPickImage={(file) => {
+            void controller?.setBackgroundImage(file).then((result) => {
+              if (result !== undefined) {
+                setBackgroundImageError(result.message)
+              }
+            })
+          }}
+        />
       </div>
     </div>
   )

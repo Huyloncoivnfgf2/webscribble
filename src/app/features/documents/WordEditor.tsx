@@ -42,6 +42,17 @@ import {
 import { printWithAnnotations } from './printExport'
 import { getAppStorage } from '../../storage'
 import {
+  MAIN_BACKGROUND_SLOT,
+  type PaperBackground,
+} from '../../../data/index'
+import {
+  inspectBackgroundImage,
+  isDarkPaperBackground,
+  paperBackgroundStyle,
+  useBackgroundImageUrl,
+} from '../backgrounds/paperBackground'
+import { BackgroundPicker } from '../backgrounds/BackgroundPicker'
+import {
   DocxAnnotationController,
   DOCX_HIGHLIGHT_COLORS,
   DOCX_PEN_COLORS,
@@ -364,6 +375,52 @@ function WordEditorInner({
   const [, setToolbarTick] = useState(0)
   const [leaving, setLeaving] = useState(false)
   const [leaveFailed, setLeaveFailed] = useState(false)
+
+  // ── Nền giấy (TASK-14C): theo tài liệu, qua repository ──
+  const [paperBackground, setPaperBackground] = useState<PaperBackground>({ kind: 'blank' })
+  const [paperImageError, setPaperImageError] = useState<string | null>(null)
+  const paperImageUrl = useBackgroundImageUrl(documentId, paperBackground.kind)
+  useEffect(() => {
+    let cancelled = false
+    void getAppStorage()
+      .foundation.backgrounds.get(documentId)
+      .then((saved) => {
+        if (!cancelled && saved !== undefined) setPaperBackground(saved)
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [documentId])
+
+  const changePaperBackground = (background: PaperBackground) => {
+    setPaperBackground(background)
+    void getAppStorage()
+      .foundation.backgrounds.set(documentId, background)
+      .catch(() => setPaperImageError('Không lưu được nền của tài liệu.'))
+  }
+
+  const pickPaperImage = (file: File) => {
+    void (async () => {
+      const check = await inspectBackgroundImage(file)
+      if (!check.ok) {
+        setPaperImageError(check.message)
+        return
+      }
+      try {
+        await getAppStorage().foundation.backgroundImages.put(
+          documentId,
+          MAIN_BACKGROUND_SLOT,
+          file,
+        )
+      } catch {
+        setPaperImageError('Không lưu được ảnh nền. Hãy thử lại.')
+        return
+      }
+      setPaperImageError(null)
+      changePaperBackground({ kind: 'image' })
+    })()
+  }
   const onBackRef = useRef(onBack)
   onBackRef.current = onBack
   const cardRef = useRef<HTMLDivElement | null>(null)
@@ -504,6 +561,17 @@ function WordEditorInner({
         )}
         <SaveStatus controller={controller} />
         {leaving && <span className="text-xs text-slate-500">Đang lưu trước khi quay lại…</span>}
+        <span className="rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm">
+          <BackgroundPicker
+            value={paperBackground}
+            imageError={paperImageError}
+            onChange={(background) => {
+              setPaperImageError(null)
+              changePaperBackground(background)
+            }}
+            onPickImage={pickPaperImage}
+          />
+        </span>
         <button
           type="button"
           onClick={openExportDialog}
@@ -569,6 +637,8 @@ function WordEditorInner({
       <div
         ref={cardRef}
         className="word-editor-surface relative mx-auto w-full max-w-3xl rounded-2xl border border-slate-200 bg-white px-5 py-6 shadow-sm sm:px-10 sm:py-8"
+        data-paper-dark={isDarkPaperBackground(paperBackground) ? 'true' : undefined}
+        style={paperBackgroundStyle(paperBackground, 1, paperImageUrl)}
       >
         <EditorContent editor={editor} className="word-editor-content" />
         {/* Lớp chú thích viết tay (TASK-07D): phủ kín thẻ

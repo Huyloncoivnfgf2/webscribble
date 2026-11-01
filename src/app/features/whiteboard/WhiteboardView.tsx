@@ -20,6 +20,12 @@ import {
   ZoomOut,
 } from 'lucide-react'
 import { getAppStorage } from '../../storage'
+import { whiteboardPageBackgroundSlot } from '../../../data/index'
+import {
+  paperBackgroundStyle,
+  useBackgroundImageUrl,
+} from '../backgrounds/paperBackground'
+import { BackgroundPicker } from '../backgrounds/BackgroundPicker'
 import {
   attachAutoScroll,
   dispatchAutoScrollMove,
@@ -33,7 +39,6 @@ import {
 import {
   WHITEBOARD_PAGE_SIZE,
   WhiteboardStore,
-  type WhiteboardBackground,
 } from './whiteboardStore'
 
 /**
@@ -56,8 +61,10 @@ export function getWhiteboardController(documentId: string): WhiteboardControlle
     store: new WhiteboardStore({
       documents: foundation.documents,
       annotations: foundation.annotations,
+      backgroundImages: foundation.backgroundImages,
     }),
     annotationEngine,
+    backgroundImages: foundation.backgroundImages,
   })
   whiteboardControllers.set(documentId, controller)
   return controller
@@ -65,43 +72,6 @@ export function getWhiteboardController(documentId: string): WhiteboardControlle
 
 export function releaseWhiteboardController(documentId: string): void {
   whiteboardControllers.delete(documentId)
-}
-
-const BACKGROUND_LABELS: Record<WhiteboardBackground, string> = {
-  blank: 'Trơn trắng',
-  dark: 'Tối',
-  ruled: 'Kẻ ngang',
-  grid: 'Lưới caro',
-  dots: 'Chấm',
-}
-
-function patternStyle(background: WhiteboardBackground, scale: number) {
-  const line = 'rgba(100, 116, 139, 0.35)'
-  const lineDark = 'rgba(148, 163, 184, 0.35)'
-  switch (background) {
-    case 'blank':
-      return { backgroundColor: '#ffffff' }
-    case 'dark':
-      return { backgroundColor: '#1e293b' }
-    case 'ruled':
-      return {
-        backgroundColor: '#ffffff',
-        backgroundImage: `linear-gradient(to bottom, transparent calc(100% - 1px), ${line} calc(100% - 1px))`,
-        backgroundSize: `100% ${Math.max(8, 32 * scale)}px`,
-      }
-    case 'grid':
-      return {
-        backgroundColor: '#ffffff',
-        backgroundImage: `linear-gradient(to right, ${line} 1px, transparent 1px), linear-gradient(to bottom, ${line} 1px, transparent 1px)`,
-        backgroundSize: `${Math.max(8, 28 * scale)}px ${Math.max(8, 28 * scale)}px`,
-      }
-    case 'dots':
-      return {
-        backgroundColor: '#ffffff',
-        backgroundImage: `radial-gradient(circle, ${lineDark} 1.5px, transparent 1.7px)`,
-        backgroundSize: `${Math.max(8, 28 * scale)}px ${Math.max(8, 28 * scale)}px`,
-      }
-  }
 }
 
 function ToolButton({
@@ -152,6 +122,12 @@ export function WhiteboardView({
   const [leaving, setLeaving] = useState(false)
   const [leaveFailed, setLeaveFailed] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [backgroundImageError, setBackgroundImageError] = useState<string | null>(null)
+  const backgroundImageUrl = useBackgroundImageUrl(
+    documentId,
+    snapshot.background.kind,
+    whiteboardPageBackgroundSlot(snapshot.pageIndex),
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -373,7 +349,7 @@ export function WhiteboardView({
               <div
                 ref={frameRef}
                 className="relative shrink-0 overflow-hidden rounded-lg shadow-md"
-                style={{ width: pageWidth, height: pageHeight, ...patternStyle(snapshot.background, snapshot.scale) }}
+                style={{ width: pageWidth, height: pageHeight, ...paperBackgroundStyle(snapshot.background, snapshot.scale, backgroundImageUrl) }}
               >
                 <canvas
                   ref={canvasRef}
@@ -431,21 +407,19 @@ export function WhiteboardView({
               </ToolButton>
             )}
             <span className="mx-1 h-5 w-px bg-slate-200" />
-            <label className="flex items-center gap-1.5 text-xs text-slate-600">
-              Nền trang
-              <select
-                aria-label="Nền trang"
-                value={snapshot.background}
-                onChange={(e) => void controller.setBackground(e.target.value as WhiteboardBackground)}
-                className="rounded-lg border border-slate-300 px-2 py-1 text-xs"
-              >
-                {(Object.keys(BACKGROUND_LABELS) as WhiteboardBackground[]).map((bg) => (
-                  <option key={bg} value={bg}>
-                    {BACKGROUND_LABELS[bg]}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <BackgroundPicker
+              value={snapshot.background}
+              imageError={backgroundImageError}
+              onChange={(background) => {
+                setBackgroundImageError(null)
+                void controller.setBackground(background)
+              }}
+              onPickImage={(file) => {
+                void controller.setBackgroundImage(file).then((result) => {
+                  setBackgroundImageError(result.message)
+                })
+              }}
+            />
             <button
               type="button"
               onClick={() => void controller.applyBackgroundToAll(snapshot.background)}

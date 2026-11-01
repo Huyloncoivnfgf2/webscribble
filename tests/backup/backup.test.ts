@@ -86,7 +86,7 @@ describe('TASK-08C — tạo backup', () => {
     counter += 1
     const db = createDatabase(`webscribble-08c-${counter}`)
     const { blob, manifest } = await createBackupArchive(db)
-    expect(manifest.counts).toEqual({ documents: 0, annotations: 0, documentContents: 0 })
+    expect(manifest.counts).toEqual({ documents: 0, annotations: 0, documentContents: 0, backgrounds: 0, backgroundImages: 0 })
     const prepared = await inspectBackupArchive(await blob.arrayBuffer())
     expect(prepared.documents).toEqual([])
     db.close()
@@ -99,7 +99,7 @@ describe('TASK-08C — tạo backup', () => {
     const { blob, manifest, fileName } = await createBackupArchive(db)
     expect(fileName).toMatch(/^webscribble-backup-\d{8}-\d{4}\.zip$/)
     expect(manifest.backupFormatVersion).toBe(1)
-    expect(manifest.counts).toEqual({ documents: 2, annotations: 2, documentContents: 1 })
+    expect(manifest.counts).toEqual({ documents: 2, annotations: 2, documentContents: 1, backgrounds: 0, backgroundImages: 0 })
     const zip = await JSZip.loadAsync(await blob.arrayBuffer())
     const pdfInZip = await zip.file(`files/${pdf.id}`)?.async('uint8array')
     expect(pdfInZip).toEqual(pdfBytes)
@@ -125,6 +125,8 @@ describe('TASK-08C — restore', () => {
       importedDocuments: 2,
       importedAnnotations: 2,
       importedContents: 1,
+      importedBackgrounds: 0,
+      importedBackgroundImages: 0,
       remappedDocuments: 0,
     })
 

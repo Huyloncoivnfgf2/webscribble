@@ -1,8 +1,12 @@
 import {
   documentSurfaceId,
+  normalizePaperBackground,
   parseDocumentSurfaceId,
+  whiteboardPageBackgroundSlot,
   type AnnotationRepository,
+  type BackgroundImageRepository,
   type DocumentRepository,
+  type PaperBackground,
 } from '../../../data/index'
 
 /**
@@ -32,18 +36,16 @@ import {
 
 export const WHITEBOARD_MIME_TYPE = 'application/vnd.webscribble.whiteboard'
 
-export type WhiteboardBackground = 'blank' | 'dark' | 'ruled' | 'grid' | 'dots'
-
-export const WHITEBOARD_BACKGROUNDS: readonly WhiteboardBackground[] = [
-  'blank',
-  'dark',
-  'ruled',
-  'grid',
-  'dots',
-]
-
+/**
+ * Nền trang dùng kiểu DÙNG CHUNG PaperBackground (TASK-14C,
+ * DEC-035). Manifest giữ version 1: các manifest cũ lưu nền
+ * dạng CHUỖI ('blank' | 'dark' | 'ruled' | 'grid' | 'dots')
+ * được `normalizePaperBackground` nâng lên dạng object khi
+ * đọc — không mất dữ liệu, không cần đổi version (bản app
+ * cũ đọc nền object chỉ suy biến về trắng, không lỗi).
+ */
 export interface WhiteboardPage {
-  background: WhiteboardBackground
+  background: PaperBackground
 }
 
 export interface WhiteboardManifest {
@@ -81,7 +83,7 @@ export function createManifest(): WhiteboardManifest {
     kind: 'webscribble-whiteboard',
     version: 1,
     pageSize: { ...WHITEBOARD_PAGE_SIZE },
-    pages: [{ background: 'blank' }],
+    pages: [{ background: { kind: 'blank' } }],
   }
 }
 
@@ -109,14 +111,12 @@ export function parseManifest(text: string): WhiteboardManifest {
   ) {
     throw new WhiteboardError('invalid-manifest')
   }
-  const pages: WhiteboardPage[] = m.pages.map((page) => {
-    const bg = (page as WhiteboardPage | null)?.background
-    return {
-      background: WHITEBOARD_BACKGROUNDS.includes(bg as WhiteboardBackground)
-        ? (bg as WhiteboardBackground)
-        : 'blank',
-    }
-  })
+  const pages: WhiteboardPage[] = m.pages.map((page) => ({
+    // Chấp nhận cả chuỗi cũ lẫn object mới (TASK-14C):
+    background: normalizePaperBackground(
+      (page as WhiteboardPage | null)?.background,
+    ),
+  }))
   return {
     kind: 'webscribble-whiteboard',
     version: 1,
@@ -128,6 +128,12 @@ export function parseManifest(text: string): WhiteboardManifest {
 export interface WhiteboardStoreDeps {
   documents: DocumentRepository
   annotations: AnnotationRepository
+  /**
+   * Ảnh nền theo trang (TASK-14C) — tùy chọn để test cũ và
+   * các nơi dựng store tối thiểu không phải đổi; vắng mặt
+   * thì các thao tác dọn/remap slot ảnh bị bỏ qua.
+   */
+  backgroundImages?: BackgroundImageRepository
 }
 
 function stagingSurfaceId(documentId: string, token: string, newIndex: number): string {
@@ -160,10 +166,12 @@ function retargetObjects(
 export class WhiteboardStore {
   private readonly documents: DocumentRepository
   private readonly annotations: AnnotationRepository
+  private readonly backgroundImages: BackgroundImageRepository | undefined
 
   constructor(deps: WhiteboardStoreDeps) {
     this.documents = deps.documents
     this.annotations = deps.annotations
+    this.backgroundImages = deps.backgroundImages
   }
 
   /** Tạo bảng trắng mới (1 trang trống) trong thư viện. */
@@ -262,13 +270,65 @@ export class WhiteboardStore {
     }
   }
 
+  /**
+   * Remap ẢNH NỀN theo trang (TASK-14C) bằng đúng bản đồ
+   * trang của remapAnnotations: ảnh ở slot `page-<old>` của
+   * trang còn sống chuyển sang slot `page-<new>`; trang bị
+   * xóa thì ảnh của nó bị xóa theo. Hai pha như annotation:
+   * đọc hết ra trước, rồi mới ghi/xóa.
+   */
+  private async remapImageSlots(
+    documentId: string,
+    mapping: Array<number | null>,
+  ): Promise<void> {
+    if (this.backgroundImages === undefined) return
+    const records = await this.backgroundImages.listForDocument(documentId)
+    const pageImages = records.filter((r) => r.slot.startsWith('page-'))
+    if (pageImages.length === 0) return
+    const moves: Array<{ fromSlot: string; toSlot: string | null; blob: Blob }> = []
+    for (const record of pageImages) {
+      const oldIndex = Number(record.slot.slice('page-'.length))
+      if (!Number.isInteger(oldIndex)) continue
+      const target = mapping[oldIndex]
+      moves.push({
+        fromSlot: record.slot,
+        toSlot:
+          target === undefined || target === null
+            ? null
+            : whiteboardPageBackgroundSlot(target),
+        blob: record.blob,
+      })
+    }
+    for (const move of moves) {
+      await this.backgroundImages.delete(documentId, move.fromSlot)
+    }
+    for (const move of moves) {
+      if (move.toSlot !== null) {
+        await this.backgroundImages.put(documentId, move.toSlot, move.blob)
+      }
+    }
+  }
+
+  /** Xóa ảnh slot của một trang khi nền không còn là ảnh. */
+  private async dropPageImageIfUnused(
+    documentId: string,
+    index: number,
+    background: PaperBackground,
+  ): Promise<void> {
+    if (this.backgroundImages === undefined || background.kind === 'image') return
+    await this.backgroundImages.delete(
+      documentId,
+      whiteboardPageBackgroundSlot(index),
+    )
+  }
+
   /** Thêm trang ở cuối. Trả manifest mới. */
   async addPage(
     documentId: string,
-    background: WhiteboardBackground = 'blank',
+    background: PaperBackground = { kind: 'blank' },
   ): Promise<WhiteboardManifest> {
     const manifest = await this.load(documentId)
-    manifest.pages.push({ background })
+    manifest.pages.push({ background: normalizePaperBackground(background) })
     await this.save(documentId, manifest)
     return manifest
   }
@@ -282,6 +342,7 @@ export class WhiteboardStore {
       i === index ? null : i < index ? i : i - 1,
     )
     await this.remapAnnotations(documentId, mapping)
+    await this.remapImageSlots(documentId, mapping)
     manifest.pages.splice(index, 1)
     await this.save(documentId, manifest)
     return manifest
@@ -304,6 +365,7 @@ export class WhiteboardStore {
       mapping[oldIndex] = newIndex
     })
     await this.remapAnnotations(documentId, mapping)
+    await this.remapImageSlots(documentId, mapping)
     manifest.pages = order.map((oldIndex) => manifest.pages[oldIndex])
     await this.save(documentId, manifest)
     return manifest
@@ -313,23 +375,35 @@ export class WhiteboardStore {
   async setPageBackground(
     documentId: string,
     index: number,
-    background: WhiteboardBackground,
+    background: PaperBackground,
   ): Promise<WhiteboardManifest> {
     const manifest = await this.load(documentId)
     if (index < 0 || index >= manifest.pages.length) throw new WhiteboardError('invalid-manifest')
-    manifest.pages[index] = { background }
+    const normalized = normalizePaperBackground(background)
+    manifest.pages[index] = { background: normalized }
     await this.save(documentId, manifest)
+    await this.dropPageImageIfUnused(documentId, index, normalized)
     return manifest
   }
 
   /** Áp một nền cho mọi trang. */
   async setAllBackgrounds(
     documentId: string,
-    background: WhiteboardBackground,
+    background: PaperBackground,
   ): Promise<WhiteboardManifest> {
     const manifest = await this.load(documentId)
-    manifest.pages = manifest.pages.map(() => ({ background }))
+    const normalized = normalizePaperBackground(background)
+    manifest.pages = manifest.pages.map(() => ({ background: normalized }))
     await this.save(documentId, manifest)
+    if (normalized.kind !== 'image' && this.backgroundImages !== undefined) {
+      // Không trang nào dùng ảnh nữa -> dọn mọi slot trang:
+      const records = await this.backgroundImages.listForDocument(documentId)
+      for (const record of records) {
+        if (record.slot.startsWith('page-')) {
+          await this.backgroundImages.delete(documentId, record.slot)
+        }
+      }
+    }
     return manifest
   }
 }

@@ -130,11 +130,15 @@ export class DexieDocumentRepository implements DocumentRepository {
       this.db.documents,
       this.db.annotations,
       this.db.documentContents,
+      this.db.documentBackgrounds,
+      this.db.backgroundImages,
       async () => {
         const existing = await this.db.documents.get(id)
         if (existing === undefined) return false
         await this.db.annotations.where('documentId').equals(id).delete()
         await this.db.documentContents.delete(id)
+        await this.db.documentBackgrounds.delete(id)
+        await this.db.backgroundImages.where('documentId').equals(id).delete()
         await this.db.documents.delete(id)
         return true
       },

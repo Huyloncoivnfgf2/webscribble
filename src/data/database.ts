@@ -10,11 +10,16 @@
  * - v2 (TASK-07A): thêm documentContents (nội dung đã chuyển đổi
  *   của DOCX). Cộng thêm thuần túy — hai bảng v1 không đổi cấu
  *   trúc, dữ liệu v1 mở lên v2 nguyên vẹn.
+ * - v3 (TASK-14C): thêm documentBackgrounds (nền theo tài liệu)
+ *   và backgroundImages (Blob ảnh nền theo khóa suy dẫn). Cộng
+ *   thêm thuần túy như v2 — dữ liệu cũ nguyên vẹn.
  */
 import Dexie, { type EntityTable } from 'dexie'
 import {
   DATABASE_NAME,
   type AnnotationSurfaceRecord,
+  type BackgroundImageRecord,
+  type DocumentBackgroundRecord,
   type DocumentContentRecord,
   type DocumentRecord,
 } from './types'
@@ -23,6 +28,8 @@ export class WebScribbleDatabase extends Dexie {
   documents!: EntityTable<DocumentRecord, 'id'>
   annotations!: EntityTable<AnnotationSurfaceRecord, 'surfaceId'>
   documentContents!: EntityTable<DocumentContentRecord, 'documentId'>
+  documentBackgrounds!: EntityTable<DocumentBackgroundRecord, 'documentId'>
+  backgroundImages!: EntityTable<BackgroundImageRecord, 'id'>
 
   constructor(name: string = DATABASE_NAME) {
     super(name)
@@ -43,6 +50,17 @@ export class WebScribbleDatabase extends Dexie {
       documents: 'id, createdAt, updatedAt',
       annotations: 'surfaceId, documentId',
       documentContents: 'documentId',
+    })
+    // Schema v3 (TASK-14C):
+    // - documentBackgrounds: nền theo tài liệu, khóa documentId.
+    // - backgroundImages: khóa suy dẫn <documentId>:<slot>; chỉ
+    //   mục documentId để liệt kê/xóa cascade theo tài liệu.
+    this.version(3).stores({
+      documents: 'id, createdAt, updatedAt',
+      annotations: 'surfaceId, documentId',
+      documentContents: 'documentId',
+      documentBackgrounds: 'documentId',
+      backgroundImages: 'id, documentId',
     })
   }
 }

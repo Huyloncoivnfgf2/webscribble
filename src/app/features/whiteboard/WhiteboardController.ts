@@ -9,7 +9,12 @@ import type {
   AnnotationEngine,
   AnnotationSurfaceSession,
 } from '../../../engines/annotation/index'
-import type { AutosaveState } from '../../../data/index'
+import {
+  whiteboardPageBackgroundSlot,
+  type AutosaveState,
+  type BackgroundImageRepository,
+  type PaperBackground,
+} from '../../../data/index'
 import {
   clampPageIndex,
   clampScale,
@@ -18,9 +23,9 @@ import {
   zoomOutScale,
   type ViewerTool,
 } from '../documents/pdfViewerState'
+import { inspectBackgroundImage } from '../backgrounds/paperBackground'
 import {
   WhiteboardError,
-  type WhiteboardBackground,
   type WhiteboardManifest,
   type WhiteboardStore,
 } from './whiteboardStore'
@@ -43,7 +48,7 @@ export interface WhiteboardSnapshot {
   status: WhiteboardStatus
   pageIndex: number
   pageCount: number
-  background: WhiteboardBackground
+  background: PaperBackground
   tool: ViewerTool
   color: string
   sizeLabel: 'S' | 'M' | 'L'
@@ -72,7 +77,7 @@ const IDLE_SNAPSHOT: WhiteboardSnapshot = {
   status: 'idle',
   pageIndex: 0,
   pageCount: 0,
-  background: 'blank',
+  background: { kind: 'blank' },
   tool: 'pen',
   color: WB_PEN_COLORS[0],
   sizeLabel: 'M',
@@ -87,6 +92,8 @@ const IDLE_SNAPSHOT: WhiteboardSnapshot = {
 export interface WhiteboardControllerDeps {
   store: WhiteboardStore
   annotationEngine: AnnotationEngine
+  /** Ảnh nền tải lên (TASK-14C) — vắng mặt thì nền ảnh không khả dụng. */
+  backgroundImages?: BackgroundImageRepository
   requestFrame?: (callback: () => void) => number
   cancelFrame?: (handle: number) => void
 }
@@ -100,6 +107,7 @@ export interface WhiteboardScrollContainerLike {
 
 export class WhiteboardController {
   private readonly store: WhiteboardStore
+  private readonly backgroundImages: BackgroundImageRepository | undefined
   private readonly annotationEngine: AnnotationEngine
   private readonly requestFrame?: (callback: () => void) => number
   private readonly cancelFrame?: (handle: number) => void
@@ -131,6 +139,7 @@ export class WhiteboardController {
 
   constructor(deps: WhiteboardControllerDeps) {
     this.store = deps.store
+    this.backgroundImages = deps.backgroundImages
     this.annotationEngine = deps.annotationEngine
     this.requestFrame = deps.requestFrame
     this.cancelFrame = deps.cancelFrame
@@ -531,7 +540,7 @@ export class WhiteboardController {
   }
 
   /** Đổi nền trang hiện tại — không đụng phiên vẽ. */
-  async setBackground(background: WhiteboardBackground): Promise<void> {
+  async setBackground(background: PaperBackground): Promise<void> {
     if (this.documentId === null) return
     try {
       this.manifest = await this.store.setPageBackground(
@@ -545,10 +554,58 @@ export class WhiteboardController {
     }
   }
 
-  /** Áp nền cho mọi trang. */
-  async applyBackgroundToAll(background: WhiteboardBackground): Promise<void> {
-    if (this.documentId === null) return
+  /**
+   * Đặt ảnh nền cho trang hiện tại (TASK-14C): kiểm tra
+   * định dạng + dung lượng, lưu Blob vào slot của trang,
+   * rồi mới chuyển nền sang dạng ảnh. Ảnh sai → trả thông
+   * báo, nền hiện tại giữ nguyên.
+   */
+  async setBackgroundImage(
+    file: Blob,
+  ): Promise<{ ok: true; message: null } | { ok: false; message: string }> {
+    if (this.documentId === null || this.backgroundImages === undefined) {
+      return { ok: false, message: 'Chưa mở bảng trắng.' }
+    }
+    const check = await inspectBackgroundImage(file)
+    if (!check.ok) return check
     try {
+      await this.backgroundImages.put(
+        this.documentId,
+        whiteboardPageBackgroundSlot(this.state.pageIndex),
+        file,
+      )
+    } catch {
+      return { ok: false, message: 'Không lưu được ảnh nền. Hãy thử lại.' }
+    }
+    await this.setBackground({ kind: 'image' })
+    return { ok: true, message: null }
+  }
+
+  /** Áp nền cho mọi trang. */
+  async applyBackgroundToAll(background: PaperBackground): Promise<void> {
+    if (this.documentId === null || this.manifest === null) return
+    try {
+      // Nền ảnh: mỗi trang cần bản sao ở slot riêng — chép
+      // ảnh của trang hiện tại sang mọi slot trang trước.
+      if (background.kind === 'image' && this.backgroundImages !== undefined) {
+        const current = await this.backgroundImages.get(
+          this.documentId,
+          whiteboardPageBackgroundSlot(this.state.pageIndex),
+        )
+        if (current === undefined) {
+          this.setState({ saveError: 'Trang hiện tại chưa có ảnh nền để áp dụng.' })
+          return
+        }
+        for (let i = 0; i < this.manifest.pages.length; i += 1) {
+          if (i !== this.state.pageIndex) {
+            await this.backgroundImages.put(
+              this.documentId,
+              whiteboardPageBackgroundSlot(i),
+              current.blob,
+            )
+          }
+        }
+      }
       this.manifest = await this.store.setAllBackgrounds(this.documentId, background)
       this.setState({ background })
     } catch {

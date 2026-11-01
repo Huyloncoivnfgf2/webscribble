@@ -9,6 +9,7 @@ export * from './backup/index'
 export * from './repositories/documentRepository'
 export * from './repositories/annotationRepository'
 export * from './repositories/documentContentRepository'
+export * from './repositories/backgroundRepository'
 export * from './storage/storageManager'
 export * from './autosave/autosaveManager'
 
@@ -26,6 +27,12 @@ import {
   DexieDocumentRepository,
   type DocumentRepository,
 } from './repositories/documentRepository'
+import {
+  DexieBackgroundImageRepository,
+  DexieDocumentBackgroundRepository,
+  type BackgroundImageRepository,
+  type DocumentBackgroundRepository,
+} from './repositories/backgroundRepository'
 import { StorageManager } from './storage/storageManager'
 
 export interface StorageFoundation {
@@ -34,6 +41,9 @@ export interface StorageFoundation {
   annotations: AnnotationRepository
   /** Nội dung đã chuyển đổi của tài liệu (TASK-07A — DOCX). */
   contents: DocumentContentRepository
+  /** Nền theo tài liệu + ảnh nền tải lên (TASK-14C — schema v3). */
+  backgrounds: DocumentBackgroundRepository
+  backgroundImages: BackgroundImageRepository
   storage: StorageManager
   /** Autosave đã nối sẵn vào AnnotationRepository.saveSurface. */
   autosave: AutosaveManager
@@ -44,7 +54,9 @@ export function createStorageFoundation(db: WebScribbleDatabase = createDatabase
   const documents = new DexieDocumentRepository(db)
   const annotations = new DexieAnnotationRepository(db)
   const contents = new DexieDocumentContentRepository(db)
+  const backgrounds = new DexieDocumentBackgroundRepository(db)
+  const backgroundImages = new DexieBackgroundImageRepository(db)
   const storage = new StorageManager()
   const autosave = new AutosaveManager((input) => annotations.saveSurface(input))
-  return { db, documents, annotations, contents, storage, autosave }
+  return { db, documents, annotations, contents, backgrounds, backgroundImages, storage, autosave }
 }

@@ -2,10 +2,13 @@ import JSZip from 'jszip'
 import type { WebScribbleDatabase } from '../database'
 import {
   ANNOTATION_SCHEMA_VERSION,
+  backgroundImageKey,
   DOCUMENT_CONTENT_VERSION,
   documentSurfaceId,
   parseDocumentSurfaceId,
   type AnnotationSurfaceRecord,
+  type BackgroundImageRecord,
+  type DocumentBackgroundRecord,
   type DocumentContentRecord,
   type DocumentRecord,
 } from '../types'
@@ -19,6 +22,10 @@ import {
  *   data/annotations.json  — mọi AnnotationSurfaceRecord
  *   data/contents.json     — mọi DocumentContentRecord
  *   files/<documentId>     — bytes Blob gốc, nguyên vẹn
+ *   data/backgrounds.json  — nền theo tài liệu + mô tả ảnh nền
+ *                            (TASK-14C; file TÙY CHỌN — backup
+ *                            cũ không có vẫn khôi phục được)
+ *   background-images/<documentId>/<slot> — bytes ảnh nền
  *
  * `backupFormatVersion` ĐỘC LẬP với phiên bản schema Dexie
  * và với schemaVersion của từng loại record. Toàn vẹn bằng
@@ -39,7 +46,27 @@ export const BACKUP_APP_TAG = 'webscribble'
 const MANIFEST_PATH = 'manifest.json'
 const ANNOTATIONS_PATH = 'data/annotations.json'
 const CONTENTS_PATH = 'data/contents.json'
+const BACKGROUNDS_PATH = 'data/backgrounds.json'
 const blobPathFor = (documentId: string) => `files/${documentId}`
+const backgroundImagePathFor = (documentId: string, slot: string) =>
+  `background-images/${documentId}/${slot}`
+
+/** Một ảnh nền trong backup: mô tả ở backgrounds.json, bytes ở file riêng. */
+export interface BackupBackgroundImageEntry {
+  id: string
+  documentId: string
+  slot: string
+  mimeType: string
+  size: number
+  path: string
+  sha256: string
+}
+
+/** Nội dung data/backgrounds.json. */
+export interface BackupBackgroundsFile {
+  settings: DocumentBackgroundRecord[]
+  images: BackupBackgroundImageEntry[]
+}
 
 export type BackupErrorKind =
   | 'not-a-backup'
@@ -106,15 +133,30 @@ export interface BackupManifest {
   createdAt: string
   /** Phiên bản schema Dexie tại thời điểm sao lưu (chỉ để tham khảo). */
   databaseSchemaVersion: number
-  counts: { documents: number; annotations: number; documentContents: number }
+  counts: {
+    documents: number
+    annotations: number
+    documentContents: number
+    /** TASK-14C: tùy chọn — backup cũ không có hai trường này. */
+    backgrounds?: number
+    backgroundImages?: number
+  }
   documents: BackupDocumentEntry[]
   annotationsFile: { path: string; sha256: string }
   contentsFile: { path: string; sha256: string }
+  /** TASK-14C: tùy chọn — vắng mặt ở backup trước TASK-14C. */
+  backgroundsFile?: { path: string; sha256: string }
 }
 
 export interface BackupSummary {
   createdAt: string
-  counts: { documents: number; annotations: number; documentContents: number }
+  counts: {
+    documents: number
+    annotations: number
+    documentContents: number
+    backgrounds?: number
+    backgroundImages?: number
+  }
   totalBlobBytes: number
 }
 
@@ -125,12 +167,17 @@ export interface PreparedRestore {
   documents: Array<{ entry: BackupDocumentEntry; blobBytes: Uint8Array }>
   annotations: AnnotationSurfaceRecord[]
   contents: DocumentContentRecord[]
+  /** TASK-14C: rỗng với backup cũ. */
+  backgrounds: DocumentBackgroundRecord[]
+  backgroundImages: Array<{ entry: BackupBackgroundImageEntry; bytes: Uint8Array }>
 }
 
 export interface RestoreReport {
   importedDocuments: number
   importedAnnotations: number
   importedContents: number
+  importedBackgrounds: number
+  importedBackgroundImages: number
   /** Số document phải đổi ID mới vì trùng với thư viện hiện tại. */
   remappedDocuments: number
 }
@@ -169,12 +216,35 @@ export async function createBackupArchive(
     const documents = await db.documents.toArray()
     const annotations = await db.annotations.toArray()
     const contents = await db.documentContents.toArray()
+    const backgroundSettings = await db.documentBackgrounds.toArray()
+    const backgroundImageRecords = await db.backgroundImages.toArray()
 
     const encoder = new TextEncoder()
     const annotationsBytes = encoder.encode(JSON.stringify(annotations))
     const contentsBytes = encoder.encode(JSON.stringify(contents))
 
     const zip = new JSZip()
+    const bgImageEntries: BackupBackgroundImageEntry[] = []
+    for (const record of backgroundImageRecords) {
+      const bytes = new Uint8Array(await record.blob.arrayBuffer())
+      const path = backgroundImagePathFor(record.documentId, record.slot)
+      zip.file(path, bytes)
+      bgImageEntries.push({
+        id: record.id,
+        documentId: record.documentId,
+        slot: record.slot,
+        mimeType: record.mimeType,
+        size: record.size,
+        path,
+        sha256: await sha256Hex(bytes),
+      })
+    }
+    const backgroundsFileData: BackupBackgroundsFile = {
+      settings: backgroundSettings,
+      images: bgImageEntries,
+    }
+    const backgroundsBytes = encoder.encode(JSON.stringify(backgroundsFileData))
+    zip.file(BACKGROUNDS_PATH, backgroundsBytes)
     const entries: BackupDocumentEntry[] = []
     for (const doc of documents) {
       const bytes = new Uint8Array(await doc.blob.arrayBuffer())
@@ -205,10 +275,13 @@ export async function createBackupArchive(
         documents: documents.length,
         annotations: annotations.length,
         documentContents: contents.length,
+        backgrounds: backgroundSettings.length,
+        backgroundImages: backgroundImageRecords.length,
       },
       documents: entries,
       annotationsFile: { path: ANNOTATIONS_PATH, sha256: await sha256Hex(annotationsBytes) },
       contentsFile: { path: CONTENTS_PATH, sha256: await sha256Hex(contentsBytes) },
+      backgroundsFile: { path: BACKGROUNDS_PATH, sha256: await sha256Hex(backgroundsBytes) },
     }
     zip.file(MANIFEST_PATH, JSON.stringify(manifest, null, 2))
 
@@ -385,11 +458,79 @@ export async function inspectBackupArchive(data: ArrayBuffer): Promise<PreparedR
     contents.push(raw as unknown as DocumentContentRecord)
   }
 
+  // Nền + ảnh nền (TASK-14C): phần TÙY CHỌN — backup cũ
+  // không có backgroundsFile thì coi như không có nền nào.
+  const backgrounds: DocumentBackgroundRecord[] = []
+  const backgroundImages: PreparedRestore['backgroundImages'] = []
+  if (manifest.backgroundsFile !== undefined) {
+    if (!isRecord(manifest.backgroundsFile)) {
+      throw invalid('backgroundsFile trong manifest không hợp lệ.')
+    }
+    const backgroundsRaw = await readCheckedJson(manifest.backgroundsFile, 'backgrounds')
+    if (
+      !isRecord(backgroundsRaw) ||
+      !Array.isArray(backgroundsRaw.settings) ||
+      !Array.isArray(backgroundsRaw.images)
+    ) {
+      throw invalid('backgrounds.json phải gồm settings + images dạng mảng.')
+    }
+    for (const raw of backgroundsRaw.settings) {
+      if (
+        !isRecord(raw) ||
+        typeof raw.documentId !== 'string' ||
+        !isRecord(raw.background) ||
+        typeof raw.updatedAt !== 'number'
+      ) {
+        throw invalid('Một bản ghi nền trong backup thiếu trường bắt buộc.')
+      }
+      if (!documentIds.has(raw.documentId)) {
+        throw invalid(`Nền mồ côi trong backup (document ${raw.documentId}).`)
+      }
+      backgrounds.push(raw as unknown as DocumentBackgroundRecord)
+    }
+    const imageIds = new Set<string>()
+    for (const raw of backgroundsRaw.images) {
+      if (
+        !isRecord(raw) ||
+        typeof raw.id !== 'string' ||
+        typeof raw.documentId !== 'string' ||
+        typeof raw.slot !== 'string' ||
+        typeof raw.mimeType !== 'string' ||
+        typeof raw.size !== 'number' ||
+        typeof raw.path !== 'string' ||
+        typeof raw.sha256 !== 'string'
+      ) {
+        throw invalid('Một mô tả ảnh nền trong backup thiếu trường bắt buộc.')
+      }
+      if (!documentIds.has(raw.documentId)) {
+        throw invalid(`Ảnh nền mồ côi trong backup (document ${raw.documentId}).`)
+      }
+      // Khóa suy dẫn phải khớp documentId + slot (DEC-035):
+      if (raw.id !== backgroundImageKey(raw.documentId, raw.slot)) {
+        throw invalid(`Khóa ảnh nền không nhất quán: ${raw.id}`)
+      }
+      if (imageIds.has(raw.id)) throw invalid(`Trùng ảnh nền trong backup: ${raw.id}`)
+      imageIds.add(raw.id)
+      const file = zip.file(raw.path)
+      if (file === null) throw new BackupError('corrupt')
+      const bytes = await file.async('uint8array')
+      if (bytes.length !== raw.size) throw new BackupError('corrupt')
+      if ((await sha256Hex(bytes)) !== raw.sha256) {
+        throw new BackupError('checksum-mismatch', { cause: new Error(raw.id) })
+      }
+      backgroundImages.push({ entry: raw as unknown as BackupBackgroundImageEntry, bytes })
+    }
+  }
+
   // Thống kê trong manifest phải khớp dữ liệu thật:
   if (
     manifest.counts.documents !== documents.length ||
     manifest.counts.annotations !== annotations.length ||
-    manifest.counts.documentContents !== contents.length
+    manifest.counts.documentContents !== contents.length ||
+    (manifest.counts.backgrounds !== undefined &&
+      manifest.counts.backgrounds !== backgrounds.length) ||
+    (manifest.counts.backgroundImages !== undefined &&
+      manifest.counts.backgroundImages !== backgroundImages.length)
   ) {
     throw invalid('Số lượng trong manifest không khớp dữ liệu thực tế.')
   }
@@ -404,6 +545,8 @@ export async function inspectBackupArchive(data: ArrayBuffer): Promise<PreparedR
     documents,
     annotations,
     contents,
+    backgrounds,
+    backgroundImages,
   }
 }
 
@@ -452,6 +595,25 @@ export async function executeRestore(
       ? record
       : { ...record, documentId: newDocumentId }
   })
+  // Nền + ảnh nền (TASK-14C): documentId qua cùng bản đồ
+  // remap; khóa ảnh SUY DẪN từ documentId mới nên tự khớp.
+  const backgroundRecords: DocumentBackgroundRecord[] = prepared.backgrounds.map(
+    (record) => ({ ...record, documentId: finalId(record.documentId) }),
+  )
+  const backgroundImageRecords: BackgroundImageRecord[] = prepared.backgroundImages.map(
+    ({ entry, bytes }) => {
+      const newDocumentId = finalId(entry.documentId)
+      return {
+        id: backgroundImageKey(newDocumentId, entry.slot),
+        documentId: newDocumentId,
+        slot: entry.slot,
+        mimeType: entry.mimeType,
+        size: entry.size,
+        updatedAt: Date.now(),
+        blob: new Blob([bytes as BlobPart], { type: entry.mimeType }),
+      }
+    },
+  )
 
   const before = await db.documents.count()
   try {
@@ -460,10 +622,18 @@ export async function executeRestore(
       db.documents,
       db.annotations,
       db.documentContents,
+      db.documentBackgrounds,
+      db.backgroundImages,
       async () => {
         if (documentRecords.length > 0) await db.documents.bulkPut(documentRecords)
         if (annotationRecords.length > 0) await db.annotations.bulkPut(annotationRecords)
         if (contentRecords.length > 0) await db.documentContents.bulkPut(contentRecords)
+        if (backgroundRecords.length > 0) {
+          await db.documentBackgrounds.bulkPut(backgroundRecords)
+        }
+        if (backgroundImageRecords.length > 0) {
+          await db.backgroundImages.bulkPut(backgroundImageRecords)
+        }
       },
     )
   } catch (cause) {
@@ -494,6 +664,8 @@ export async function executeRestore(
     importedDocuments: documentRecords.length,
     importedAnnotations: annotationRecords.length,
     importedContents: contentRecords.length,
+    importedBackgrounds: backgroundRecords.length,
+    importedBackgroundImages: backgroundImageRecords.length,
     remappedDocuments: remap.size,
   }
 }

@@ -557,3 +557,16 @@ Xem KNOWN_ISSUES.md. Tóm tắt sau TASK-02:
   (58 file)**, lint 0 lỗi, build đạt; Browser QA CDP touch 9/9.
   Chưa kiểm chứng thiết bị thật/Safari (ISSUE-006). Kế tiếp:
   TASK-14C (nền dùng chung) theo brief.
+
+- **TASK-14C — Nền giấy dùng chung: DONE ngày 2026-11-01.**
+  DEC-035: một mô hình `PaperBackground` 10 loại (trắng, bảng
+  đen, kẻ dòng 3 khoảng cách, ô vuông, lưới chấm, chấm, caro,
+  kẻ toán, kẻ nhạc, ảnh tải lên) dùng chung qua
+  `paperBackgroundStyle` + `BackgroundPicker`; Dexie v3 cộng
+  thêm bảng nền theo tài liệu + ảnh nền khóa suy dẫn; manifest
+  whiteboard giữ v1 tương thích hai chiều; backup format v1
+  mở rộng tùy chọn mang theo nền/ảnh. **639/639 test (59
+  file)**, lint 0 lỗi, build đạt; Browser QA production 18/18
+  (gồm ảnh giả bị từ chối, reload giữ nền, PDF nền dưới
+  trang, DOCX bảng đen). Chưa kiểm chứng thiết bị thật/Safari
+  (ISSUE-006). Kế tiếp: TASK-14D (kiểu bút + preset).

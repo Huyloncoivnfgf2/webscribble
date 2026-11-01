@@ -50,7 +50,9 @@ describe('TASK-07A — migration v1 → v2 bảo toàn dữ liệu', () => {
     // Mở bằng database hiện tại (v2):
     const db = createDatabase(name)
     const foundation = createStorageFoundation(db)
-    expect(db.verno).toBe(2)
+    // Chuỗi migration hiện kết thúc ở v3 (TASK-14C cộng thêm
+    // hai bảng nền) — dữ liệu v1 vẫn phải nguyên vẹn:
+    expect(db.verno).toBe(3)
     const doc = await foundation.documents.getById('doc-old')
     expect(doc?.name).toBe('cu.pdf')
     expect(await doc?.blob.text()).toBe('abc')

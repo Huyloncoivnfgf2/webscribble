@@ -11,7 +11,16 @@
  * nguyên trang cũ kèm trạng thái lỗi lưu, không âm thầm bỏ dữ
  * liệu.
  */
-import type { AutosaveState, DocumentRepository } from '../../../data/index'
+import {
+  DEFAULT_PAPER_BACKGROUND,
+  MAIN_BACKGROUND_SLOT,
+  type AutosaveState,
+  type BackgroundImageRepository,
+  type DocumentBackgroundRepository,
+  type DocumentRepository,
+  type PaperBackground,
+} from '../../../data/index'
+import { inspectBackgroundImage } from '../backgrounds/paperBackground'
 import type {
   AnnotationEngine,
   AnnotationSurfaceSession,
@@ -38,6 +47,9 @@ import {
 export interface PdfViewerDeps {
   documents: DocumentRepository
   annotationEngine: AnnotationEngine
+  /** Nền theo tài liệu + ảnh nền (TASK-14C) — tùy chọn cho test. */
+  backgrounds?: DocumentBackgroundRepository
+  backgroundImages?: BackgroundImageRepository
   /** Renderer PDF dùng chung (tùy chọn; overlay tự tạo nếu thiếu). */
   pdfRenderer?: PdfPageRenderer
   /**
@@ -76,6 +88,8 @@ export interface PdfViewerSnapshot {
   scale: number
   zoomMode: 'fit' | 'manual'
   tool: ViewerTool
+  /** Nền giấy của tài liệu (TASK-14C) — áp dưới trang PDF. */
+  background: PaperBackground
   saveState: AutosaveState
   saveError: string | null
   canUndo: boolean
@@ -95,6 +109,7 @@ const IDLE_SNAPSHOT: PdfViewerSnapshot = {
   scale: 1,
   zoomMode: 'fit',
   tool: 'pen',
+  background: { ...DEFAULT_PAPER_BACKGROUND },
   saveState: 'idle',
   saveError: null,
   canUndo: false,
@@ -232,6 +247,12 @@ export class PdfViewerController {
         pageCount: handle.pageCount,
         zoomMode: 'fit',
       })
+      // Nền đã lưu của tài liệu (TASK-14C) — lỗi đọc nền
+      // không được chặn mở tài liệu, chỉ về mặc định:
+      const savedBackground =
+        (await this.deps.backgrounds?.get(documentId).catch(() => undefined)) ??
+        DEFAULT_PAPER_BACKGROUND
+      this.setState({ background: savedBackground })
       const opened = await this.openPageInternal(0)
       if (opened) this.setState({ status: 'ready' })
     })
@@ -533,6 +554,43 @@ export class PdfViewerController {
     if (engine === null) return
     if (tool === 'pen' || tool === 'highlighter') engine.setTool(tool)
     else engine.setTool(tool)
+  }
+
+  // ── Nền giấy (TASK-14C) ───────────────────────────────────
+
+  /** Đổi nền của tài liệu hiện tại và lưu lại (theo tài liệu). */
+  async setBackground(background: PaperBackground): Promise<void> {
+    const documentId = this.state.documentId
+    this.setState({ background })
+    if (documentId === null || this.deps.backgrounds === undefined) return
+    try {
+      await this.deps.backgrounds.set(documentId, background)
+    } catch {
+      this.setState({ saveError: 'Không lưu được nền của tài liệu.' })
+    }
+  }
+
+  /**
+   * Đặt ảnh nền cho tài liệu: kiểm tra định dạng + dung
+   * lượng, lưu Blob vào slot chính, rồi chuyển nền sang
+   * dạng ảnh. Ảnh sai → trả thông báo, nền giữ nguyên.
+   */
+  async setBackgroundImage(
+    file: Blob,
+  ): Promise<{ ok: true; message: null } | { ok: false; message: string }> {
+    const documentId = this.state.documentId
+    if (documentId === null || this.deps.backgroundImages === undefined) {
+      return { ok: false, message: 'Chưa mở tài liệu.' }
+    }
+    const check = await inspectBackgroundImage(file)
+    if (!check.ok) return check
+    try {
+      await this.deps.backgroundImages.put(documentId, MAIN_BACKGROUND_SLOT, file)
+    } catch {
+      return { ok: false, message: 'Không lưu được ảnh nền. Hãy thử lại.' }
+    }
+    await this.setBackground({ kind: 'image' })
+    return { ok: true, message: null }
   }
 
   undo(): void {

@@ -17,6 +17,11 @@ import {
 } from 'lucide-react'
 import { getAppStorage } from '../../storage'
 import {
+  paperBackgroundStyle,
+  useBackgroundImageUrl,
+} from '../backgrounds/paperBackground'
+import { BackgroundPicker } from '../backgrounds/BackgroundPicker'
+import {
   attachAutoScroll,
   dispatchAutoScrollMove,
   shouldAutoScrollForTool,
@@ -58,12 +63,19 @@ export function PdfViewer({ documentId, onBack }: PdfViewerProps) {
   const [snapshot, setSnapshot] = useState<PdfViewerSnapshot | null>(null)
   const [pageInput, setPageInput] = useState('1')
   const [exportOpen, setExportOpen] = useState(false)
+  const [backgroundImageError, setBackgroundImageError] = useState<string | null>(null)
+  const backgroundImageUrl = useBackgroundImageUrl(
+    snapshot?.documentId ?? null,
+    snapshot?.background.kind ?? 'blank',
+  )
 
   useEffect(() => {
     const { foundation, annotationEngine } = getAppStorage()
     const controller = new PdfViewerController({
       documents: foundation.documents,
       annotationEngine,
+      backgrounds: foundation.backgrounds,
+      backgroundImages: foundation.backgroundImages,
     })
     controllerRef.current = controller
     setSnapshot(controller.getSnapshot())
@@ -296,6 +308,24 @@ export function PdfViewer({ documentId, onBack }: PdfViewerProps) {
             <span className="hidden sm:inline">Vừa khung</span>
           </button>
         </div>
+
+        <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:block" />
+        <BackgroundPicker
+          value={snapshot?.background ?? { kind: 'blank' }}
+          disabled={!ready}
+          imageError={backgroundImageError}
+          onChange={(background) => {
+            setBackgroundImageError(null)
+            void controller?.setBackground(background)
+          }}
+          onPickImage={(file) => {
+            void controller?.setBackgroundImage(file).then((result) => {
+              if (result !== undefined) {
+                setBackgroundImageError(result.message)
+              }
+            })
+          }}
+        />
       </div>
 
       {snapshot?.saveError && (
@@ -336,9 +366,17 @@ export function PdfViewer({ documentId, onBack }: PdfViewerProps) {
             style={{
               width: snapshot?.pageCssWidth ? `${snapshot.pageCssWidth}px` : undefined,
               height: snapshot?.pageCssHeight ? `${snapshot.pageCssHeight}px` : undefined,
+              ...(snapshot !== null
+                ? paperBackgroundStyle(snapshot.background, snapshot.scale, backgroundImageUrl)
+                : {}),
             }}
           >
-            <canvas ref={pdfCanvasRef} className="absolute left-0 top-0 bg-white shadow" />
+            <canvas
+              ref={pdfCanvasRef}
+              className={`absolute left-0 top-0 shadow ${
+                (snapshot?.background.kind ?? 'blank') === 'blank' ? 'bg-white' : ''
+              }`}
+            />
             <canvas
               ref={annoCanvasRef}
               className="absolute left-0 top-0"

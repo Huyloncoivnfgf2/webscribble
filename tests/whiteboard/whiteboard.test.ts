@@ -51,7 +51,7 @@ describe('TASK-12 — WhiteboardStore', () => {
   it('tạo bảng trắng: document mang mime riêng, manifest 1 trang, pageCount đồng bộ', async () => {
     const world = makeWorld()
     const { id, manifest } = await world.store.create('Bảng kiểm tra')
-    expect(manifest.pages).toEqual([{ background: 'blank' }])
+    expect(manifest.pages).toEqual([{ background: { kind: 'blank' } }])
     const record = await world.foundation.documents.getById(id)
     expect(record?.mimeType).toBe(WHITEBOARD_MIME_TYPE)
     expect(record?.pageCount).toBe(1)
@@ -112,10 +112,10 @@ describe('TASK-12 — WhiteboardStore', () => {
     expect(await objectsOnPage(world, id, 1)).toEqual([{ marker: 'p2' }])
     expect(await objectsOnPage(world, id, 2)).toEqual([{ marker: 'p0' }])
     // Nền cũng đi theo trang:
-    await world.store.setPageBackground(id, 2, 'grid')
+    await world.store.setPageBackground(id, 2, { kind: 'grid' })
     await world.store.movePage(id, 2, 0)
     const manifest = await world.store.load(id)
-    expect(manifest.pages[0].background).toBe('grid')
+    expect(manifest.pages[0].background).toEqual({ kind: 'grid' })
 
     const single = await world.store.create('Mot trang')
     await expect(world.store.deletePage(single.id, 0)).rejects.toMatchObject({ kind: 'last-page' })
@@ -132,10 +132,10 @@ describe('TASK-12 — WhiteboardStore', () => {
       pageIndex: 0,
       objects: [{ marker: 'giu-nguyen' }],
     })
-    await world.store.setPageBackground(id, 1, 'dots')
-    await world.store.setAllBackgrounds(id, 'ruled')
+    await world.store.setPageBackground(id, 1, { kind: 'dots' })
+    await world.store.setAllBackgrounds(id, { kind: 'ruled' })
     const manifest = await world.store.load(id)
-    expect(manifest.pages.map((p) => p.background)).toEqual(['ruled', 'ruled'])
+    expect(manifest.pages.map((p) => p.background)).toEqual([{ kind: 'ruled' }, { kind: 'ruled' }])
     expect(await objectsOnPage(world, id, 0)).toEqual([{ marker: 'giu-nguyen' }])
     world.db.close()
   })
@@ -256,10 +256,10 @@ describe('TASK-12 — WhiteboardController', () => {
       cancelFrame: scheduler.cancel,
     })
     await controller.open(id, new FakeCanvasElement() as unknown as HTMLCanvasElement)
-    await controller.setBackground('grid')
-    expect(controller.getSnapshot().background).toBe('grid')
+    await controller.setBackground({ kind: 'grid' })
+    expect(controller.getSnapshot().background).toEqual({ kind: 'grid' })
     const manifest = await world.store.load(id)
-    expect(manifest.pages[0].background).toBe('grid')
+    expect(manifest.pages[0].background).toEqual({ kind: 'grid' })
     await controller.close()
     world.db.close()
   }, 30000)
@@ -270,7 +270,7 @@ describe('TASK-12 — Backup/Restore bảng trắng', () => {
     const world = makeWorld()
     const { id } = await world.store.create('Backup WB')
     await world.store.addPage(id)
-    await world.store.setPageBackground(id, 1, 'dots')
+    await world.store.setPageBackground(id, 1, { kind: 'dots' })
     await world.foundation.annotations.saveSurface({
       surfaceId: documentSurfaceId(id, 0),
       documentId: id,
@@ -299,7 +299,7 @@ describe('TASK-12 — Backup/Restore bảng trắng', () => {
       annotations: targetFoundation.annotations,
     })
     const manifest = await targetStore.load(restored.id)
-    expect(manifest.pages.map((p) => p.background)).toEqual(['blank', 'dots'])
+    expect(manifest.pages.map((p) => p.background)).toEqual([{ kind: 'blank' }, { kind: 'dots' }])
     expect(
       (await targetFoundation.annotations.getSurface(documentSurfaceId(restored.id, 1)))?.objects,
     ).toEqual([{ marker: 'wb-net-2' }])
